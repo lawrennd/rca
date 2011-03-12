@@ -1,11 +1,11 @@
 function [X,D] = rca(Y, Z, sigma_sq)
-
-%   (Z)       (X)       | Y|Z,X ~ N(ΧW+ZV+μ, σ²I)
+%{
+%   (Z)       (X)       | Y|Z,X ~ N(ΧW'+ZV'+μ, σ²I)
 %     \       /         |   W,V ~ N(0,I)
-%   V  \     /  W       | explained + residual covariance =
-%       \   /           |----------------------------------
-%        v v            |  ZZ' + σ² + XX' =
-%  μ --> (Y) <-- σ²     |         Σ + ΧΧ'
+%   V  \     /  W       |-----------------------------------
+%       \   /           | residual + explained covariance
+%        v v            |    XX'   +      ZZ' + σ² 
+%  μ --> (Y) <-- σ²     |    ΧΧ'   +          Σ
 %
 % Problem: We consider the case where Z is known and hence the covariance
 % of data Y is already partially explained by Σ=ZZ'+σ². One would want to
@@ -19,23 +19,30 @@ function [X,D] = rca(Y, Z, sigma_sq)
 % same time we maintain the global optima in the solution of the
 % generalised problem Σ¯¹YY'S=SD, the solution being X as the first
 % Q eigenvectors of YY'.
-% Author: Alfredo Kalaitzis, 18-11-09
+%}
+%
+% SEEALSO : eig
+%
+% Author: Alfredo A. Kalaitzis, 2009, 2011
 
-Sigma = Z*Z' + sigma_sq*eye(size(Z,1)); % explained covariance
+% RCA
+
+Sigma = Z*Z' + sigma_sq*eye(size(Z,1)); % Explained covariance.
+%{
 % Solve for S through a regular eigenvalue problem of transformed Y.
-% [U, Lamda_sq] = eig(Sigma);
-% Lamda = diag(sqrt(diag(Lamda_sq)));
-% Lamda_inv = diag(1./diag(Lamda));
-% Yprm = Lamda_inv*U'*Y; % transform Y st Kprm = Xprm*Xprm' + I
-% [V,D] = eig(Yprm*Yprm');
-% S = U*Lamda_inv*V; % S = Σ¯¹Τ = UΛ¯²U'UΛV = UΛ¯¹V
+[U, Lamda] = eig(Sigma); % Eigen-decompose Sigma.
+Lamda_sqrt = diag(sqrt(diag(Lamda)));
+Lamda_invsqrt = diag(1./diag(Lamda_sqrt));
+Y_ = Lamda_invsqrt*U'*Y; % Transform Y st K_ = X_*X_' + I
+[V,D] = eig(Y_*Y_');
+S = U*Lamda_invsqrt*V; % S = Σ¯¹Τ = UΛ¯¹U'UΛ¹/²V = UΛ¯¹/²V 
+%}
 
-Yinprod = Y*Y'; % inner product matrix
-% solve for S via a generalised eigenvalue problem of Y.
+Yinprod = Y*Y'; % Inner product matrix.
+% Solve for S via a generalised eigenvalue problem of YY' and Σ: YY'S=ΣSD.
+% S contains the eigenvectors of Yinprod. X columns are the Q principal
+% eigenvectors, up to scaling and rotation.
 [S,D] = eig(Yinprod,Sigma);
-
-% S now contains the eigenvectors of Yinprod and thus X as the Q principal
-% eigenvectors.
-[D,ind] = sort(diag(D),'descend'); % sort eigenvalues and keep permutation
-X = S(:,ind); % sort eigenvectors according to permutation
+[D,ind] = sort(diag(D),'descend'); % Sort eigenvalues and save permutation.
+X = S(:,ind); % Permute eigenvectors.
 end
