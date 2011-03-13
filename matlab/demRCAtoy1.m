@@ -45,22 +45,23 @@ title('Y space'),
 
 %% Infer X through RCA.
 [Xinf,D] = rca(Y, Z, sigma_sq);
-Xinf = Xinf(:,1:2); % Only need the first 2 eigenvectors.
-
-% Find latent rotation and scaling of inferred X.
+Xinf = Xinf(:,1:2); % Need only the first 2 eigenvectors.
+% Find rotation and scaling of recovered X.
 Xinf = Xinf*sqrt(N);
 Xtrns = Xinf;
 [d, Xtrns, tr] = procrustes(X, Xinf);
-disp(['dissimilarity (sum of squared errors) = ' num2str(d)]);
+% d = sum(sum((Xtrns-X).^2,2)) /sum(sum((X-repmat(mean(X,1),size(X,1),1)).^2,1));
+disp(['Dissimilarity (sum of squared errors) = ' num2str(d)]);
 
 %% Plot inferred X.
 numstrs = num2cell((1:size(X,1)));
 figure(2), clf,
 % subplot(1,2,1),
-hold on, plot(X(:,1), X(:,2), 'xk'),
+hold on, plot(X(:,1), X(:,2), 'xg', 'MarkerSize', 3),
 text(X(:,1), X(:,2), numstrs, 'color', [0 .7 0]),
+hold on, plot(Xtrns(:,1), Xtrns(:,2), 'xr', 'MarkerSize', 3)
+text(Xtrns(:,1), Xtrns(:,2), numstrs, 'color', [.8 0 0])
+legend('True','Recovered')
 % title('True')
 % subplot(1,2,2),
-hold on, plot(Xtrns(:,1), Xtrns(:,2), 'xk')
-text(Xtrns(:,1), Xtrns(:,2), numstrs, 'color', [.8 0 0])
 % title('Inferred (up to rotation/scaling)')

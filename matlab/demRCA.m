@@ -16,10 +16,12 @@ dtaTP53 = exprs_tp53_RMA(:, idx_top500);
 dtaTMXF = exprs_null_RMA(:, idx_top500);
 
 % For every time-point, subtract mean expression along all genes.
-% Should not be standardized; might need to look at signal variance in the
+% We do not standardise if we need to look at the signal variance in the
 % context of all signals variances.
-dtaTP53 = dtaTP53 - repmat(mean(dtaTP53,2), 1, size(dtaTP53,2));
-dtaTMXF = dtaTMXF - repmat(mean(dtaTMXF,2), 1, size(dtaTMXF,2));
+dtaTP53 = ( dtaTP53 - repmat(mean(dtaTP53,2),1,size(dtaTP53,2)) ) ./ ...
+    repmat(std(dtaTP53,0,2), 1, size(dtaTP53,2));
+dtaTMXF = ( dtaTMXF - repmat(mean(dtaTMXF,2),1,size(dtaTMXF,2)) ) ./ ...
+    repmat(std(dtaTMXF,0,2), 1, size(dtaTMXF,2));
 
 tTrue = [0:20:240 0 20 40 60 120 180 240]';
 kern = kernCreate(tTrue, 'rbf');
@@ -30,8 +32,18 @@ kern.inverseWidth = 1/(typDiff*typDiff); % Characteristic inverse-width.
 % the second, that the two profiles are generated independently.
 K_comb = kernCompute(kern, tTrue) + eye(20)*0.01;
 K_ind = blkdiag(K_comb(1:13,1:13),K_comb(14:end,14:end));
-figure(1); imshow(K_comb); figure(2); imshow(K_ind);
+figure(1); clf; subplot(1,2,1); imshow(K_comb); subplot(1,2,2); imshow(K_ind);
 
 %%
-Y = [dtaTP53' dtaTMXF']; % Concatenate profiles of both conditions.
-YtY = Y'*Y; % Gram matrix. Full rank.
+Y = [dtaTP53' dtaTMXF']'; % Concatenate profiles of both conditions.
+% YYt = Y*Y'; % Inner-product matrix; full rank.
+[X,D] = rca(Y, K_comb);
+[X_,D_] = rca(Y, K_ind);
+
+figure(2);
+subplot(3,1,1);
+bar([D D_]); title('Eigenvalue spectrum'), legend('w/ K_{comb}','w/ K_{ind}'),
+subplot(3,1,2);
+plot(X);
+subplot(3,1,3);
+plot(X_), ylim([-5 5])

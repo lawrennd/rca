@@ -18,14 +18,13 @@ function [Y,X,Z] = rcaSample(W,V,N,sigma_sq)
 
 % RCA
 
-[D,Q] = size(W); % Dimensions.
+[D,Q] = size(W); % Observed and latent dimensions.
 P = size(V,2);
 % Sample latent variables X,Z from zero-mean, unit-variance Gaussians.
 X = gaussSamp(eye(Q), N);
 Z = gaussSamp(eye(P), N);
 % XWt = X*W'; ZVt = Z*V';
 Y = X*W' + Z*V' + gaussSamp(sigma_sq*eye(D), N); % Generate data from the model.
-% Y = mgd_sample(WX + VZ, obs_noise);
 end
 
 
