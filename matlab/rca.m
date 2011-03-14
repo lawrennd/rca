@@ -43,7 +43,7 @@ Y_ = Lamda_invsqrt*U'*Y; % Transform Y st K_ = X_*X_' + I
 S = U*Lamda_invsqrt*V; % S = Σ¯¹Τ = UΛ¯¹U'UΛ¹/²V = UΛ¯¹/²V 
 %}
 
-YYt = Y*Y'; % Inner product matrix; covariance in the dual-space of Y.
+YYt = Y*Y'/size(Y,2); % Inner product matrix; covariance in the dual-space of Y.
 % Solve for S via a generalised eigenvalue problem of YY' and Σ: YY'S=ΣSD.
 % S contains the generarised eigenvectors of YY' and Σ. X columns are the Q
 % principal generalised eigenvectors, up to scaling and rotation.
