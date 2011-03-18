@@ -1,5 +1,5 @@
-function [X,D] = rca(Y, varargin)
-%
+function [X, D] = rca(Y, varargin)
+
 %   (Z)       (X)       | Y|Z,X ~ N(ΧW'+ZV'+μ, σ²I)
 %     \       /         |   W,V ~ N(0,I)
 %   V  \     /  W       |-----------------------------------
@@ -44,11 +44,12 @@ S = U*Lamda_invsqrt*V; % S = Σ¯¹Τ = UΛ¯¹U'UΛ¹/²V = UΛ¯¹/²V
 %}
 
 YYt = Y*Y'/size(Y,2); % Inner product matrix; covariance in the dual-space of Y.
+
 % Solve for S via a generalised eigenvalue problem of YY' and Σ: YY'S=ΣSD.
 % S contains the generarised eigenvectors of YY' and Σ. X columns are the Q
 % principal generalised eigenvectors, up to scaling and rotation.
 [S,D] = eig(YYt,Sigma);
-[D,ind] = sort(diag(D),'descend'); % Sort eigenvalues and save permutation.
-X = S(:,ind); % Permute eigenvectors.
-% T = Sigma*S;
+[D,ind] = sort(diag(D),'descend');
+X = S(:,ind);
+
 end

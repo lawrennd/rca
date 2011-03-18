@@ -1,0 +1,40 @@
+%   (Z)       (X)       | Y|Z,X ~ N(ΧW+ZV+μ, σ²I)
+%     \       /         |   W,V ~ N(0,I)
+%   V  \     /  W       | explained + residual covariance =
+%       \   /           |----------------------------------
+%        v v            |  ZZ' + σ² + XX' =
+%  μ --> (Y) <-- σ²     |         Σ + ΧΧ'
+%
+% Problem: We assume that the covariance of data Y is already partially
+% explained by Σ=ZZ'+σ² and Z is known. We want to estimate X by
+% marginalising out the mapping W and optimising the observed data marginal
+% N(Y|0,XΣwX'+σ²I) wrt X. The problem is to distinguish the X from Σw after
+% estimation of the XΣwX' product. Gradient optimization approaches are
+% currently being applied to address this issue (Nicolo??).
+%
+% Analytic approach: If we transform the observations Y st X'X = I
+% (equivalent to constraining the prior over X to be spherical) we
+% eliminate the aforementioned indeterminancy between X and Σw while at the
+% same time we maintain the global optimality in the solution of the
+% of the generalised problem Σ¯¹YY'S=SD, the solution being X as the first
+% Q eigenvectors of YY'.
+
+function [X,D] = rca(Y, Z, sigma_sq)
+Sigma = Z*Z' + sigma_sq*eye(size(Z,1)); % explained covariance
+[U, Lamda_sq] = eig(Sigma);
+Lamda = diag(sqrt(diag(Lamda_sq)));
+% Lamda_inv = diag(1./diag(Lamda));
+% Yprm = Lamda_inv*U'*Y; % transform Y st Kprm = Xprm*Xprm' + I
+Yinprod = Y*Y'; % inner product matrix
+
+% -if- Σ is invertible
+% Sigma_inv = U*(Lamda_sq^-1)*U'; % Σ = UΛ²U'
+% [S,D] = eig(Sigma_inv*Yinprod);
+% -or- solve for S via a generalised eigenvalue problem.
+[S,D] = eig(Yinprod,Sigma);
+
+% S now contains the eigenvectors of Yinprod and thus X as the Q principal
+% eigenvectors.
+[D,ind] = sort(diag(D),'descend'); % sort eigenvalues and keep permutation
+X = S;%(:,ind); % sort eigenvectors according to permutation
+end

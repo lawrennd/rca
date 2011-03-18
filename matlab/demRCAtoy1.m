@@ -10,6 +10,9 @@ addpath(genpath('~/mlprojects/matlab/general/'))
 addpath(genpath('~/mlprojects/gp/matlab/'));
 addpath(genpath('~/mlprojects/ndlutil'));
 
+randn('seed', 1e7)
+rand('seed', 1e7)
+
 % Specify mappings here.
 W = [5 0 0; 0 5 0]';    % True W. D-by-Q.
 V = [-3 4 5; -1 -2 1]'; % True V. D-by-P.
@@ -23,7 +26,7 @@ XWt = X*W'; ZVt = Z*V';
 z = zeros(2,1); W=W*4; V=V*4;
 
 % Illustrate latent bases in Y space.
-figure(1), clf, grid on, axis equal, hold on, view([50 25])
+figure(3), clf, grid on, axis equal, hold on, view([50 25])
 xlabel('X'), ylabel('Y'), zlabel('Z')
 quiver3(z, z, z, W(1,:)', W(2,:)', W(3,:)', 1, 'b', 'linewidth', 1);
 quiver3(z, z, z, V(1,:)', V(2,:)', V(3,:)', 1, 'r', 'linewidth', 1);
