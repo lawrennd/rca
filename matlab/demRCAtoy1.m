@@ -9,6 +9,7 @@
 addpath(genpath('~/mlprojects/matlab/general/'))
 addpath(genpath('~/mlprojects/gp/matlab/'));
 addpath(genpath('~/mlprojects/ndlutil'));
+addpath(genpath('~/mlprojects/rca/matlab/'));
 
 randn('seed', 1e7)
 rand('seed', 1e7)
@@ -20,12 +21,12 @@ N = 100;                % No. generated datapoints.
 % Mu = [0 0 0]';   % True bias.
 sigma_sq = .5;  % True noise variance.
 
-% Sample and latent data-points from the RCA model and generate the observed.
+% Sample latent data-points and generate the observed.
 [Y, X, Z] = rcaSample(W, V, N, sigma_sq);
 XWt = X*W'; ZVt = Z*V';
-z = zeros(2,1); W=W*4; V=V*4;
 
 % Illustrate latent bases in Y space.
+z = zeros(2,1); W=W*4; V=V*4;
 figure(3), clf, grid on, axis equal, hold on, view([50 25])
 xlabel('X'), ylabel('Y'), zlabel('Z')
 quiver3(z, z, z, W(1,:)', W(2,:)', W(3,:)', 1, 'b', 'linewidth', 1);
@@ -46,8 +47,8 @@ plot3(Y(:,1), Y(:,2), Y(:,3),'ok', 'markerfacecolor','g','markersize', 4),
 title('Y space'),
 % legend('W', 'V', 'C(W)', 'C(V)', 'X', 'Z', 'Y');
 
-%% Infer X through RCA.
-[Xinf,D] = rca(Y, Z, sigma_sq);
+%% Recover X through RCA.
+[Xinf,D] = rca(Y', Z, sigma_sq);
 Xinf = Xinf(:,1:2); % Need only the first 2 eigenvectors.
 % Find rotation and scaling of recovered X.
 Xinf = Xinf*sqrt(N);

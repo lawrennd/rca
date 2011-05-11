@@ -1,4 +1,4 @@
-function [Y,X,Z] = rcaSample(W,V,N,sigma_sq)
+function [Y,X,Z] = rcaSample(W,V,n,sigma_sq)
 
 %   (Z)       (X)       | Y|Z,X ~ N(ΧW'+ZV'+μ, σ²I)
 %     \       /         |   W,V ~ N(0,I)
@@ -18,13 +18,13 @@ function [Y,X,Z] = rcaSample(W,V,N,sigma_sq)
 
 % RCA
 
-[D,Q] = size(W); % Observed and latent dimensions.
-P = size(V,2);
+[d,q] = size(W); % Observed and latent dimensions.
+p = size(V,2);
 % Sample latent variables X,Z from zero-mean, unit-variance Gaussians.
-X = gaussSamp(eye(Q), N);
-Z = gaussSamp(eye(P), N);
+X = gaussSamp(eye(q), n);
+Z = gaussSamp(eye(p), n);
 % XWt = X*W'; ZVt = Z*V';
-Y = X*W' + Z*V' + gaussSamp(sigma_sq*eye(D), N); % Generate data from the model.
+Y = X*W' + Z*V' + gaussSamp(sigma_sq*eye(d), n); % Generate data from the model.
 end
 
 

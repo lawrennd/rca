@@ -4,7 +4,7 @@ function [X, D] = rca(Y, varargin)
 %     \       /         |   W,V ~ N(0,I)
 %   V  \     /  W       |-----------------------------------
 %       \   /           | residual + explained covariance
-%        v v            |    XX'   +      ZZ' + σ² 
+%        v v            |    XX'   +      ZZ' + σ²    =
 %  μ --> (Y) <-- σ²     |    ΧΧ'   +          Σ
 %
 % Problem: We consider the case where Z is known and hence the covariance
@@ -20,19 +20,30 @@ function [X, D] = rca(Y, varargin)
 % generalised problem YY'S=ΣSD, the solution being X as the first
 % Q generalised eigenvectors of YY' and Σ.
 %
+% Y is a design matrix with datapoints as the rows.
+% Varargin contains the explained covariance term (and possibly noise).
+%
+% Usage: [W, D] = rca([X Y]', blkDiagCxCy);
+%
 % SEEALSO : eig
 %
 % Author: Alfredo A. Kalaitzis, 2009, 2011
 
 % RCA
 
-if length(varargin) > 1
+if length(varargin) > 1 % Covariance, noise terms are given separated.
     Z = varargin{1};
     sigma_sq = varargin{2};
     Sigma = Z*Z' + sigma_sq*eye(size(Z,1)); % Explained covariance.
 else
     Sigma = varargin{1};
 end
+
+n = size(Y,1);
+
+% Center variable.
+% Y = Y - repmat(mean(Y,1), n, 1);
+
 %{
 % Solve for S through a regular eigenvalue problem of transformed Y.
 [U, Lamda] = eig(Sigma); % Eigen-decompose Sigma.
@@ -43,13 +54,19 @@ Y_ = Lamda_invsqrt*U'*Y; % Transform Y st K_ = X_*X_' + I
 S = U*Lamda_invsqrt*V; % S = Σ¯¹Τ = UΛ¯¹U'UΛ¹/²V = UΛ¯¹/²V 
 %}
 
-YYt = Y*Y'/size(Y,2); % Inner product matrix; covariance in the dual-space of Y.
+%{
+% Inner product matrix; if rows are datapoints, then columns are coordinates
+% and this is the covariance in the dual-space of Y.
+% if strcmp(dual, 'dual')
+%     Cy = Y*Y'/(size(Y,2)-1);
+% end
+%}
 
-% Solve for S via a generalised eigenvalue problem of YY' and Σ: YY'S=ΣSD.
-% S contains the generarised eigenvectors of YY' and Σ. X columns are the Q
+% Solve for S via a generalised eigenvalue problem of Y'Y and Σ: Y'YS=ΣSD.
+% S contains the generarised eigenvectors of Y'Y and Σ. X columns are the q
 % principal generalised eigenvectors, up to scaling and rotation.
-[S,D] = eig(YYt,Sigma);
-[D,ind] = sort(diag(D),'descend');
-X = S(:,ind);
+Cy = cov(Y);
+[S,D] = eig(Cy,Sigma);
+[D,I] = sort(diag(D),'descend');
+X = S(:,I);
 
-end
