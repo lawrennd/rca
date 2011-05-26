@@ -1,11 +1,11 @@
 function [X, D] = rca(Y, varargin)
 
 %   (Z)       (X)       | Y|Z,X ~ N(ΧW'+ZV'+μ, σ²I)
-%     \       /         |   W,V ~ N(0,I)
+%     \       /         |   Z,X ~ N(0,I)
 %   V  \     /  W       |-----------------------------------
 %       \   /           | residual + explained covariance
-%        v v            |    XX'   +      ZZ' + σ²    =
-%  μ --> (Y) <-- σ²     |    ΧΧ'   +          Σ
+%        v v            |    XX'   +   ZZ' + σ²    =
+%  μ --> (Y) <-- σ²     |    ΧΧ'   +       Σ
 %
 % Problem: We consider the case where Z is known and hence the covariance
 % of data Y is already partially explained by Σ=ZZ'+σ². One would want to
