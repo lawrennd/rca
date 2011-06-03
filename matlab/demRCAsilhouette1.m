@@ -25,7 +25,7 @@ dataSetName = 'silhouette';
 converged = false;
 tracesC = [];
 k = 1;  t = 1; i = 1;
-limit = 1e-6;
+limit = 1e-3;
 
 
 % Load data.
@@ -45,13 +45,13 @@ Sy = Sy + abs(mean(diag(Sy)))*1e-6*eye(sy); S(sx+1:end,sx+1:end) = Sy;
 Sx = Sx + abs(mean(diag(Sx)))*1e-6*eye(sx); S(1:sx,1:sx) = Sx;      % Add jitter.
 
 % for alpha = .05:.05:1;  % Fraction of mean trace as noise level.
-    alpha = .3;
+    alpha = .3; beta = .3;
     noisey = alpha*trace(Sy)/sy;    noisex = alpha*trace(Sx)/sx;
     Ny = noisey*eye(sy); Nx = noisex*eye(sx); Noise = blkdiag(Nx,Ny);  % Fix noise with alpha.
     W1W1 = zeros(sy);   W4W4 = zeros(sx);   % No independent components.
     W2W2 = zeros(sy);   W3W3 = zeros(sx);   % No shared components.
     W2 = zeros(sy);     W3 = zeros(sx,sy);
-    dz1 = 0;            dz3 = 0;
+    dz1 = 0;            dz2 = size(W2W2,2);    dz3 = 0;
 
     %{
     % Init. shared-latent space.
@@ -117,15 +117,15 @@ Sx = Sx + abs(mean(diag(Sx)))*1e-6*eye(sx); S(1:sx,1:sx) = Sx;      % Add jitter
 % for d = 1:57
     d=18;
     [MLE E var CCA] = pcca(X,Y,d);
-    % ZTest = XTest * CCA.Wx * sqrt(diag(CCA.r)); % E(Zt|Xt).
-    % YPred_pCCA = ZTest * MLE.Wzy' + repmat(mean(Y,1), size(ZTest,1), 1);
+        % ZTest = XTest * CCA.Wx * sqrt(diag(CCA.r)); % E(Zt|Xt).
+        % YPred_pCCA = ZTest * MLE.Wzy' + repmat(mean(Y,1), size(ZTest,1), 1);
     YPred_pCCA = XTest * pdinv(Sx) * MLE.Wzx * MLE.Wzy' + repmat(mean(Y,1), size(XTest,1), 1);
     
     Ysqdiff = (YTest - YPred_pCCA).^2;
     RMSerror_pCCA = sqrt(sum(Ysqdiff(:))/numel(Ysqdiff)); % Root mean-square error.
     
-    C = [MLE.Wzx; MLE.Wzy]*[MLE.Wzx' MLE.Wzy'] + blkdiag(Sx-(MLE.Wzx*MLE.Wzx'), Sy-(MLE.Wzy*MLE.Wzy'));
-    LML_pCCA = -.5 * ((sy+sx)*log(2*pi) + logdet(C) + trace(sum(sum(pdinv(C)'.*S))));
+%     C = [MLE.Wzx; MLE.Wzy]*[MLE.Wzx' MLE.Wzy'] + blkdiag(Sx-(MLE.Wzx*MLE.Wzx'), Sy-(MLE.Wzy*MLE.Wzy'));
+%     LML_pCCA = -.5 * ((sy+sx)*log(2*pi) + logdet(C) + trace(sum(sum(pdinv(C)'.*S))));
 % end
 % figure(2), clf, plot(RMSerror_pCCA,'b.'), figure(1);
 
@@ -148,9 +148,9 @@ RMSerror_CCA = sqrt(sum(Ysqdiff(:))/numel(Ysqdiff)); % Root mean-square error.
 
 %% Animate predictions.
 demLinRegSilhouette,
-%{
+%%{
 clf
-xyzankurAnimCompare(YTest, YPred_LR, 48, {'Ytest','Linear Regression',...
+xyzankurAnimCompare(YTest, YPred_LR, 96, {'Ytest','Linear Regression',...
     ['pCCA (d=' num2str(length(CCA.r)) ')'], 'RCA'},...
     YPred_pCCA, YPred_RCA);
 %}
