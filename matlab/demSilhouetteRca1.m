@@ -1,21 +1,17 @@
-% DEMCCASILHOUETTE RCA demo on silhouette data.
+% DEMSILHOUETTERCA1 RCA demo on Agarwal & Triggs silhouette data.
 %
 % FORMAT
-% DESC Fit private and shared latent spaces with flipping-RCA. Also
-% compares with linear regression and pCCA.
+% DESC Fits private and shared latent spaces with iterative RCA. Compares
+% against linear regression and PCCA.
 %
-% SEEALSO : pcca, cca
+% SEEALSO : pcca, cca, demSilhouetteLr1, xyzankurAnimCompareMultiple
 %
 % COPYRIGHT : Alfredo A. Kalaitzis, 2011
-
-% CCA
+%
+% RCA
 
 addpath(genpath('~/mlprojects/matlab/general/'))
-addpath(genpath('~/mlprojects/cca/matlab/'));
-addpath(genpath('~/mlprojects/rca/matlab/'));
-importLatest('datasets');
-importLatest('ndlutil');
-importLatest('mocap');
+importTool({'rca','cca','datasets','ndlutil','mocap'})
 
 % savedState = struct(RandStream.getDefaultStream).State;
 % defaultStream.State = savedState;
@@ -27,24 +23,24 @@ tracesC = [];
 k = 1;  t = 1; i = 1;
 limit = 1e-3;
 
-
 % Load data.
 [X, Y, XTest, YTest] = mapLoadData(dataSetName);
 [n, sx] = size(X);
 sy = size(Y, 2);
 
-% Induce some isotropic noise.
+% Induce isotropic noise.
 noise = .03;
-X = X + randn(size(X))*noise; %sqrt(noise*trace(cov(X))/sx);
-XTest = XTest + randn(size(XTest))*noise; %sqrt(noise*trace(cov(X))/sx);
-Y = Y + randn(size(Y))*noise; %sqrt(noise*trace(cov(Y))/sy);
-YTest = YTest + randn(size(YTest))*noise; % sqrt(noise*trace(cov(Y))/sy);
+X = X + randn(size(X))*noise;
+XTest = XTest + randn(size(XTest))*noise;
+Y = Y + randn(size(Y))*noise;
+YTest = YTest + randn(size(YTest))*noise;
 
 Sy = cov(Y, 1); Sx = cov(X, 1); S = cov([X Y], 1);  % Data covariances.
-Sy = Sy + abs(mean(diag(Sy)))*1e-6*eye(sy); S(sx+1:end,sx+1:end) = Sy;
-Sx = Sx + abs(mean(diag(Sx)))*1e-6*eye(sx); S(1:sx,1:sx) = Sx;      % Add jitter.
+Sy = Sy + abs(mean(diag(Sy)))*1e-6*eye(sy); S(sx+1:end,sx+1:end) = Sy;  % Add jitter.
+Sx = Sx + abs(mean(diag(Sx)))*1e-6*eye(sx); S(1:sx,1:sx) = Sx;
 
 % for alpha = .05:.05:1;  % Fraction of mean trace as noise level.
+
     alpha = .3; beta = .3;
     noisey = alpha*trace(Sy)/sy;    noisex = alpha*trace(Sx)/sx;
     Ny = noisey*eye(sy); Nx = noisex*eye(sx); Noise = blkdiag(Nx,Ny);  % Fix noise with alpha.
@@ -62,7 +58,7 @@ Sx = Sx + abs(mean(diag(Sx)))*1e-6*eye(sx); S(1:sx,1:sx) = Sx;      % Add jitter
     W2W2 = W2*W2';          W3W3 = W3*W3';
     dz2 = size(W,2);
     %}
-    disp ' ';  diagnostic;
+    disp ' '; diagnostic;
 
     oldLML = LML_RCA;
     while ~converged
@@ -113,19 +109,16 @@ Sx = Sx + abs(mean(diag(Sx)))*1e-6*eye(sx); S(1:sx,1:sx) = Sx;      % Add jitter
 %     i = i + 1;
 % end
 
-%% Train with pCCA. minRMS=3.0291 for d=13
+%% Train with pCCA. minRMS=3.0291 for d=18
 % for d = 1:57
     d=18;
     [MLE E var CCA] = pcca(X,Y,d);
-        % ZTest = XTest * CCA.Wx * sqrt(diag(CCA.r)); % E(Zt|Xt).
-        % YPred_pCCA = ZTest * MLE.Wzy' + repmat(mean(Y,1), size(ZTest,1), 1);
-    YPred_pCCA = XTest * pdinv(Sx) * MLE.Wzx * MLE.Wzy' + repmat(mean(Y,1), size(XTest,1), 1);
+    YPred_pCCA = XTest*pdinv(Sx)*MLE.Wzx * MLE.Wzy' + repmat(mean(Y,1), size(XTest,1), 1);
     
     Ysqdiff = (YTest - YPred_pCCA).^2;
     RMSerror_pCCA = sqrt(sum(Ysqdiff(:))/numel(Ysqdiff)); % Root mean-square error.
-    
-%     C = [MLE.Wzx; MLE.Wzy]*[MLE.Wzx' MLE.Wzy'] + blkdiag(Sx-(MLE.Wzx*MLE.Wzx'), Sy-(MLE.Wzy*MLE.Wzy'));
-%     LML_pCCA = -.5 * ((sy+sx)*log(2*pi) + logdet(C) + trace(sum(sum(pdinv(C)'.*S))));
+    % C = [MLE.Wzx; MLE.Wzy]*[MLE.Wzx' MLE.Wzy'] + blkdiag(Sx-(MLE.Wzx*MLE.Wzx'), Sy-(MLE.Wzy*MLE.Wzy'));
+    % LML_pCCA = -.5 * ((sy+sx)*log(2*pi) + logdet(C) + trace(sum(sum(pdinv(C)'.*S))));
 % end
 % figure(2), clf, plot(RMSerror_pCCA,'b.'), figure(1);
 
@@ -147,10 +140,9 @@ RMSerror_CCA = sqrt(sum(Ysqdiff(:))/numel(Ysqdiff)); % Root mean-square error.
 %}
 
 %% Animate predictions.
-demLinRegSilhouette,
+demSilhouetteLr1,
 %%{
 clf
-xyzankurAnimCompare(YTest, YPred_LR, 96, {'Ytest','Linear Regression',...
-    ['pCCA (d=' num2str(length(CCA.r)) ')'], 'RCA'},...
-    YPred_pCCA, YPred_RCA);
+xyzankurAnimCompareMultiple(YTest, {YPred_LR, YPred_pCCA, YPred_RCA}, ...
+    96, {'Ytest','Linear Regression', ['pCCA (d=' num2str(length(CCA.r)) ')'], 'RCA'});
 %}
