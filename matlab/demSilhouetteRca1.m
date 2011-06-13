@@ -12,11 +12,14 @@
 
 addpath(genpath('~/mlprojects/matlab/general/'))
 importTool({'rca','cca','datasets','ndlutil','mocap'})
+fontName = 'times';
+fontSize = 26;
 
 % savedState = struct(RandStream.getDefaultStream).State;
 % defaultStream.State = savedState;
 
 clf, clc
+
 dataSetName = 'silhouette';
 converged = false;
 tracesC = [];
@@ -39,9 +42,8 @@ Sy = cov(Y, 1); Sx = cov(X, 1); S = cov([X Y], 1);  % Data covariances.
 Sy = Sy + abs(mean(diag(Sy)))*1e-6*eye(sy); S(sx+1:end,sx+1:end) = Sy;  % Add jitter.
 Sx = Sx + abs(mean(diag(Sx)))*1e-6*eye(sx); S(1:sx,1:sx) = Sx;
 
-% for alpha = .05:.05:1;  % Fraction of mean trace as noise level.
-
-    alpha = .3; beta = .3;
+for alpha = .05:.05:1;  % Fraction of mean trace as noise level.
+%     alpha = .3; beta = .3;
     noisey = alpha*trace(Sy)/sy;    noisex = alpha*trace(Sx)/sx;
     Ny = noisey*eye(sy); Nx = noisex*eye(sx); Noise = blkdiag(Nx,Ny);  % Fix noise with alpha.
     W1W1 = zeros(sy);   W4W4 = zeros(sx);   % No independent components.
@@ -100,27 +102,31 @@ Sx = Sx + abs(mean(diag(Sx)))*1e-6*eye(sx); S(1:sx,1:sx) = Sx;
         converged = (LML_RCA - oldLML) < limit;
         oldLML = LML_RCA;
     end
-%     converged = false;
-%     stats.alpha(i) = alpha;
-%     stats.RMSerror(i) = RMSerror_RCA;
-%     stats.dz1(i) = dz1;
-%     stats.dz2(i) = dz2;
-%     stats.dz3(i) = dz3;
-%     i = i + 1;
-% end
+    converged = false;
+    stats.alpha(i) = alpha;
+    stats.RMSerror(i) = RMSerror_RCA;
+    stats.dz1(i) = dz1;
+    stats.dz2(i) = dz2;
+    stats.dz3(i) = dz3;
+    i = i + 1;
+end
+
 
 %% Train with pCCA. minRMS=3.0291 for d=18
-% for d = 1:57
-    d=18;
+for d = 1:57
+%     d=18;
     [MLE E var CCA] = pcca(X,Y,d);
     YPred_pCCA = XTest*pdinv(Sx)*MLE.Wzx * MLE.Wzy' + repmat(mean(Y,1), size(XTest,1), 1);
     
     Ysqdiff = (YTest - YPred_pCCA).^2;
-    RMSerror_pCCA = sqrt(sum(Ysqdiff(:))/numel(Ysqdiff)); % Root mean-square error.
+    RMSerror_pCCA(d) = sqrt(sum(Ysqdiff(:))/numel(Ysqdiff)); % Root mean-square error.
     % C = [MLE.Wzx; MLE.Wzy]*[MLE.Wzx' MLE.Wzy'] + blkdiag(Sx-(MLE.Wzx*MLE.Wzx'), Sy-(MLE.Wzy*MLE.Wzy'));
     % LML_pCCA = -.5 * ((sy+sx)*log(2*pi) + logdet(C) + trace(sum(sum(pdinv(C)'.*S))));
-% end
+end
 % figure(2), clf, plot(RMSerror_pCCA,'b.'), figure(1);
+
+makeplot
+
 
 %{
 %% Train with CCA.
@@ -141,7 +147,7 @@ RMSerror_CCA = sqrt(sum(Ysqdiff(:))/numel(Ysqdiff)); % Root mean-square error.
 
 %% Animate predictions.
 demSilhouetteLr1,
-%%{
+%{
 clf
 xyzankurAnimCompareMultiple(YTest, {YPred_LR, YPred_pCCA, YPred_RCA}, ...
     96, {'Ytest','Linear Regression', ['pCCA (d=' num2str(length(CCA.r)) ')'], 'RCA'});

@@ -13,7 +13,8 @@
 
 clear
 addpath(genpath('~/mlprojects/matlab/general/'))
-importLatest({'netlab','kern','optimi','datasets','gprege'})
+importLatest('netlab')
+importTool({'kern','optimi','datasets','gprege'})
 
 load DellaGattadata.mat
 N = size(exprs_tp53_RMA,2);
@@ -52,13 +53,15 @@ X = K_comb * S(:,perm(D>1)) * sqrt(diag(D(D>1)-1)); % Retrieve residual variance
     % [X D] = rca(Y', K_comb);
 
 % Plot evectors, combined kernel.
-figure(1), clf, plot(X(:,1:end)), xlim([0 21]), title('Generalised eigenvectors (combined case)')
+figure(1), clf, colormap gray
+plot(X(:,1:end)), xlim([0 21]), title('Generalised eigenvectors (combined case)')
+imagesc(K_comb), colorbar, daspect([1 1 1])
 
 figure(2), clf
 Y = [exprs_tp53_RMA; exprs_null_RMA]; % Prepare the whole dataset.
 Y = Y - repmat(mean(Y,2),1, N); % Remove mean across features (genes).
 Xproj = S(:,perm(D>1))'*Y;
-dists = sum(Xproj.^2,1);
+dists = sum(Xproj.^2,1); % Compute norms.
 
 % auc = compareROC(dists, DGatta_labels_byTSNItop100);
 auc = compareROC(dists, DGatta_labels_byTSNItop100, BATSrankingFilepath);
