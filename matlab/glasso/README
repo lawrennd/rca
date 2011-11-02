@@ -1,0 +1,9 @@
+If matlab returns error message 'g95: not found'. Go to http://g95.org/docs.shtml.
+As instructed, download the compiler, unpack it and create a symbolic link:
+
+tar -zxvf g95-x86-linux.tgz
+ln -s $PWD/g95-install/bin/*g95* ~/bin/g95
+
+Try to recompile the Fortran source:
+
+mex -v glasso.F

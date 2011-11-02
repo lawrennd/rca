@@ -1,4 +1,4 @@
-% DEMTP63RCA1 RCA demo on TP53 expression time-series.
+% DEMTP63RCA1 RCA demo on TP63 expression time-series.
 % FORMAT
 % DESC Fit residual components (row rank covariance), with RCA, which
 % potentially explain differences of gene expression between case and
@@ -16,8 +16,8 @@ addpath(genpath('~/mlprojects/matlab/general/'))
 importLatest('netlab')
 importTool({'kern','optimi','datasets','gprege'})
 
-load DellaGattadata.mat
-N = size(exprs_tp53_RMA,2);
+load DellaGattaData.mat
+N = size(exprs_tp63_RMA,2);
 
 tTrue = [timepoints; truncTimepoints]; % [0:20:240 0 20 40 60 120 180 240]';
 kern = kernCreate(tTrue, 'rbf');
@@ -32,10 +32,10 @@ K_comb = kernCompute(kern, tTrue) + eye(20)*noise;
     % for k=0:20;
     % idx_top = sortIndex( ((k*1000)+1) : ((k*1000)+1000) );
     % idx_top = sortIndex(1:500);
-idx_top = 1:length(exprs_tp53_RMA);
+idx_top = 1:length(exprs_tp63_RMA);
 
 % Concatenate profiles of both conditions.
-Y = [exprs_tp53_RMA(:, idx_top); exprs_null_RMA(:, idx_top)];
+Y = [exprs_tp63_RMA(:, idx_top); exprs_null_RMA(:, idx_top)];
 
 % In this application we apply the dual representation of RCA. This mean
 % that want centred data in the sense that the mean is zero across the
@@ -58,7 +58,7 @@ plot(X(:,1:end)), xlim([0 21]), title('Generalised eigenvectors (combined case)'
 imagesc(K_comb), colorbar, daspect([1 1 1])
 
 figure(2), clf
-Y = [exprs_tp53_RMA; exprs_null_RMA]; % Prepare the whole dataset.
+Y = [exprs_tp63_RMA; exprs_null_RMA]; % Prepare the whole dataset.
 Y = Y - repmat(mean(Y,2),1, N); % Remove mean across features (genes).
 Xproj = S(:,perm(D>1))'*Y;
 dists = sum(Xproj.^2,1); % Compute norms.
