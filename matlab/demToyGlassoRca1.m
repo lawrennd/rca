@@ -12,6 +12,7 @@
 clear, clc
 addpath(genpath('~/mlprojects/matlab/general/'))
 addpath(genpath('~/mlprojects/rca/matlab/glasso/'))
+addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 importTool({'rca','ndlutil','gprege'})
 asym = @(x) sum(sum(abs(x - x.'))); % Asymmetry test.
 
@@ -36,29 +37,34 @@ TNs = zeros(length(lambda), 1);
 %% Data generation.
 
 d = 50; % Observed dimensions.
-p = 3; % Low-rank
+p = 3;  % Low-rank
 n = 100;
 sigma2_n = 1e-2; % Noise variance.
+% Generate a sparse positive-definite precision matrix w/ given density and
+% non-zero entries normally distributed w/ mean 1 and variance 2.
 s = RandStream('mcg16807','Seed', 1985); RandStream.setDefaultStream(s) % 1985
-validLambda = false;
 density = .01;
-sp = ceil((d^2-d)/2 * density);
-sel = randperm(d^2); % Random positions.
-sel(mod(sel,d+1) == 1) = []; % Remove positions of the diagonal.
-sel = sel(1:ceil( (d^2-d)/2 * density ));    % Enough random positions to satisfy the density.
-Lambda = zeros(d);
-Lambda(sel) = 1;
-Lambda = triu(Lambda + Lambda',1) .* (randn(d)*sqrt(2) + 1);
-while ~validLambda
-    testLambda = Lambda + Lambda' + diag(abs(randn(d,1))).*4; % 4
-    validLambda = all( eig(testLambda) > 0 );
+spN = ceil((d^2-d)/2 * density);    % Number of non-zeros elements that satisfy the density.
+sel = randperm(d^2);        % Random positions.
+sel( mod(sel,d+1) == 1 ) = [];      % Remove positions of the diagonal.
+sel = sel( 1:spN );         % Enough random positions to satisfy the density.
+Lambda = zeros(d);  Lambda(sel) = 1;        % Non-zero positions mask.
+Lambda = triu(Lambda + Lambda',1);  % Upper triangular after balancing.
+Lambda = Lambda .* (randn(d)*sqrt(2) + 1);  % Apply mask.
+Lambda = Lambda + Lambda';  % Symmetrify.
+pd = 1; diagonal = eye(d);
+while pd > 0
+    testLambda = Lambda + diagonal;
+%     testLambda = Lambda + diag(abs(randn(d,1))).*4; % 4
+    [~, pd] = chol(testLambda);
+    diagonal = diagonal*2;
 end
-Lambda = testLambda;
-Sigma = pdinv(Lambda);
+Lambda = testLambda;    Sigma = pdinv(Lambda);
+% Sample from p(y).
 W = randn(d,p);
 WWt = W*W';
 Theta = WWt + Sigma + sigma2_n*eye(d);
-Y = gaussSamp(Theta, n); % Sample from p(y).
+Y = gaussSamp(Theta, n);
 figure(1), clf, colormap('hot')
 subplot(131), imagesc(Lambda), title('sparse \Lambda'), colorbar
 subplot(132), imagesc(Sigma), title('sparse-inverse \Sigma'), colorbar
@@ -82,7 +88,11 @@ for c = 1:2
     Cy_ = Y_'*Y_/n;
     A = boolean( triu(Lambda,1) ~= 0 );
     for i = 1:length(lambda)
-        [Sigma_hat{i}, Lambda_hat{i}] = glasso(d, Cy_, 0, lambda(i)*ones(d), 0,0,0,1, 1e-4, 1e4, zeros(d), zeros(d));
+        [Sigma_hat{i}, Lambda_hat{i}] = ...
+                glasso( d, Cy_, 0, lambda(i)*ones(d), ...   % numVars, empirical covariance, computePath, regul.matrix
+                0, 0, 0, 1, ...                             % approximate, warmInit, verbose, penalDiag
+                1e-4, 1e4, ...                              % tolThreshold (1e-4), maxIter (1e4)
+                zeros(d), zeros(d));                        % warmLambda, warmSigma
         triuLambda_hat{i} = triu(Lambda_hat{i}, 1);
         figure(3), imagesc(Lambda_hat{i}), colormap(hot), colorbar,...
             title([ '(RCA)GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
@@ -105,41 +115,6 @@ figure(4), legend([ legends{1} ' auc: ' num2str(AUCs(1)) ], [ legends{2} ' auc: 
 %}
 
 
-%% **USELESS** Standard GLasso on confounded simulated data, with varying lambda,
-% *after* having explained away the true low-rank structure via RCA.
-%{
-s = RandStream('mcg16807','Seed', 666); RandStream.setDefaultStream(s) % 23, 1e5
-Y_ = gaussSamp(Theta, n);   Y_ = Y_ - repmat(mean(Y_),n,1);
-Cy_ = Y_'*Y_/n;
-% Retrieve residual variance basis via RCA.
-Theta_exp = WWt + sigma2_n*eye(d)*.95;
-[S D] = eig(Cy_, Theta_exp);    [D perm] = sort(diag(D),'descend');
-V_hat = Theta_exp * S(:,perm(D>1)) * sqrt(diag(D(D>1)-1));
-VVt_hat = V_hat * V_hat' + sigma2_n*eye(d)*.05;
-figure(3), imagesc(VVt_hat), colorbar
-A = boolean(triu(full(Lambda),1) ~= 0);
-for i = 1:length(lambda)
-    [Sigma_hat{i}, Lambda_hat{i}] = glasso(d, VVt_hat, 0, lambda(i)*ones(d),0,0,0,0,1e-4,1e+4, zeros(d), zeros(d));
-    triuLambda_hat{i} = triu(Lambda_hat{i}, 1);
-    figure(3), imagesc(Lambda_hat{i}), colormap(hot), colorbar, ...
-        title([ '(RCA)GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
-    % Evaluation
-    B{i} = boolean( triuLambda_hat{i} ~= 0 );
-    TPs(i) = sum( A(:) & B{i}(:) );
-    FPs(i) = sum( ~A(:) & B{i}(:) );
-    FNs(i) = sum( A(:) & ~B{i}(:) );
-    TNs(i) = sum( ~A(:) & ~B{i}(:) );
-end
-TPRs = TPs ./ (TPs + FNs);
-Precisions = TPs ./ (TPs + FPs);
-FPRs = FPs ./ (FPs + TNs);
-figure(2), hold on, plot(TPRs, Precisions, ':rs'), ylim([0 1]), xlabel('Recall'), ylabel('Precision')
-title('Recall-Precision');
-figure(4), hold on, plot(FPRs, TPRs, ':rs'), xlim([0 1]), xlabel('FPR'), ylabel('TPR')
-AUC = trapz(flipud(FPRs), flipud(TPRs)) / max(FPRs);
-%}
-
-
 %% Recovery of low-rank component WWt by explaining away the true
 % sparse-inverse covariance Sigma.
 %{
@@ -147,8 +122,8 @@ Theta_exp = Sigma + sigma2_n*eye(d);
 [S D] = eig(Cy, Theta_exp);    [D perm] = sort(diag(D),'descend');
 W_hat = Theta_exp * S(:,perm(D>1)) * sqrt(diag(D(D>1)-1));
 WWt_hat = W_hat * W_hat';
-figure(3), imagesc(WWt_hat), colorbar, title('WW'' by RCA');
-figure(4), imagesc(WWt_hat - WWt), title('WW''-WWt_hat'), colorbar;
+figure(3), clf, imagesc(WWt_hat), colorbar, title('WW'' by RCA');
+figure(4), clf, imagesc(WWt_hat - WWt), title('WW''-WWt_hat'), colorbar;
 %}
 
 
@@ -179,43 +154,95 @@ for i = 1:length(lambda) % Try different magnitudes of lambda.
     while ~converged
         fprintf('\nEM-RCA iteration: %d\n', k);
         
-        % E step.
-        WWt_plus_noise_inv = pdinv( WWt_hat_old + sigma2_n*eye(d) );
-        V_f = pdinv(  WWt_plus_noise_inv  +  Lambda_hat_old ); % Posterior variance of f.
-        E_f = (V_f * WWt_plus_noise_inv *  Y')'; % Posterior expectations E[f_n] as rows.
-        Avg_E_fft = V_f  +  (E_f'*E_f)./n; % Second moment expectation.
-        if rank(Avg_E_fft) < d
-            warning([ 'rank(Avg_E_fft) = ', num2str(rank(Avg_E_fft)) ]); %#ok<*WNTAG>
-        end
+        
+        
+        em_k = 1;
+        em_converged = false;
+        while ~em_converged
+            fprintf('\nEM iteration: %d\n', em_k);
 
-        % M step. Maximise p(f|Lambda) wrt Lambda, via GLASSO.
-%         fprintf('\nEmpirical covariance for GLasso\n rank: %d cond: %f\n\n', rank(Avg_E_fft), cond(Avg_E_fft))
-        warmLambda_hat = Lambda_hat_old;    warmSigma_hat = Sigma_hat_old;
-        [Sigma_hat_new, Lambda_hat_new, iter, avgTol, hasError] = ...
-            glasso ( d, Avg_E_fft, 0, lambda(i).*ones(d), ...   % numVars, empirical covariance, computePath, regul.matrix
-            0, warmInit, 1, 1, ...  % approximate, warmInit, verbose, penalDiag
-            1e-4, 1e2, ...          % tolThreshold, maxIter
-            warmSigma_hat, warmLambda_hat);
-%         if any(asym(Lambda_hat_new))
-%             warning([ 'GLasso produced asymmetric Lambda_hat_new by ',...
-%                 num2str(asym(Lambda_hat_new)), '. Lambda_hat_new not symmetrified.' ]);
-%             Lambda_hat_new = (Lambda_hat_new + Lambda_hat_new') ./ 2; %   Symmetrify.
-%         end
-        Lambda_hat_new_inv = pdinv(Lambda_hat_new);
-        
-        % EM feedback.
-        Theta_hat = WWt_hat_old + sigma2_n*eye(d) + Lambda_hat_new_inv;
-        lml_new_em = -log(2*pi)*d*n/2 - log(det(Theta_hat))*n/2 - sum(sum((Y'*Y)'.*pdinv(Theta_hat)))/2;
-        fprintf(['GLasso:\n GLasso iterations: %d\n Lambda_hat_new assymetry: %f\n ' ...
-            'hasError: %d\n lambda: %f\n lml_new after EM: %f\n'], ...
-            iter, asym(Lambda_hat_new), hasError, lambda(i), lml_new_em);
-        figure(2), plot(k, lml_new_em,'.b'), hold on
-        
-        % Error check.
-        if lml_new_em < lml_old
-            warning([num2str(lml_new_em - lml_old) ' lml drop observed after this EM iteration!']);
-            break
+            
+            
+            
+            
+            
+            % E step.
+            WWt_plus_noise_inv = pdinv( WWt_hat_old + sigma2_n*eye(d) );
+            V_f = pdinv(  WWt_plus_noise_inv  +  Lambda_hat_old ); % Posterior variance of f.
+            E_f = (V_f * WWt_plus_noise_inv *  Y')'; % Posterior expectations E[f_n] as rows.
+            Avg_E_fft = V_f  +  (E_f'*E_f)./n; % Second moment expectation.
+            %             if rank(Avg_E_fft) < d
+            %                 warning([ 'rank(Avg_E_fft) = ', num2str(rank(Avg_E_fft)) ]); %#ok<*WNTAG>
+            %             end
+
+            % Variational lower bound after E step. *Should equal the lml*.
+            [lowerBound_e, Q_e, H_e] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_old);
+            
+            % M step. Maximise p(f|Lambda) wrt Lambda, via GLASSO.
+            %         fprintf('\nEmpirical covariance for GLasso\n rank: %d cond: %f\n\n', rank(Avg_E_fft), cond(Avg_E_fft))
+            warmLambda_hat = Lambda_hat_old;    warmSigma_hat = Sigma_hat_old;
+            [Sigma_hat_new, Lambda_hat_new, iter, avgTol, hasError] = ...
+                glasso ( d, Avg_E_fft, 0, lambda(i).*ones(d), ...   % numVars, empirical covariance, computePath, regul.matrix
+                0, warmInit, 1, 1, ...  % approximate, warmInit, verbose, penalDiag
+                1e-8, 1e2, ...          % tolThreshold (1e-4), maxIter (1e2)
+                warmSigma_hat, warmLambda_hat);
+            %             if any(asym(Lambda_hat_new))
+            %             warning([ 'GLasso produced asymmetric Lambda_hat_new by ',...
+            %                 num2str(asym(Lambda_hat_new)), '. Lambda_hat_new not symmetrified.' ]);
+            %                 Lambda_hat_new = (Lambda_hat_new + Lambda_hat_new') ./ 2; %   Symmetrify.
+            %             end
+            Lambda_hat_new_inv = pdinv(Lambda_hat_new);
+            
+            % Variational lower bound after M step. *Should be less than the lml*.
+            [lowerBound_m, Q_m, H_m] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_old);
+            
+            % EM feedback.
+            Theta_hat = WWt_hat_old + sigma2_n*eye(d) + Lambda_hat_new_inv;
+            lml_new_em = -log(2*pi)*d*n/2 - log(det(Theta_hat))*n/2 - sum(sum((Y'*Y)'.*pdinv(Theta_hat)))/2;
+            fprintf(['GLasso:\n GLasso iterations: %d\n '...
+                ... % 'Lambda_hat_new assymetry: %f\n ' ...
+                'avgTol: %e\n hasError: %d\n lambda: %e\n lml_new after EM: %e\n'], ...
+                iter, ...
+                ... % asym(Lambda_hat_new), ...
+                avgTol, hasError, lambda(i), lml_new_em);
+            figure(2), plot(k, lml_new_em,'.b'), hold on
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            % Convergence / error check.
+            if (lml_new_em - lml_old) < limit
+                if lml_old > lml_new_em
+                    warning([num2str(lml_new_em - lml_old) ' lml drop observed after this EM iteration!']);
+                    break
+                else
+                    em_converged = true;
+                    fprintf('EM algorithm converged.\n\n')
+                end
+            end
+            % Prepare for new iteration.
+            lml_old = lml_new_em;
+            warmInit = true;
+            Lambda_hat_old = Lambda_hat_new;    Sigma_hat_old = Sigma_hat_new;
+            em_k = em_k + 1;
+            k = k + 1;
         end
+        
+        
+        
+        
+        
+        
+        % EM error check.
+%         if lml_new_em < lml_old
+%             warning([num2str(lml_new_em - lml_old) ' lml drop observed after this EM iteration!']);
+%             break
+%         end
         
         % RCA step: Maximisation of p(y) wrt to W, Cy partially explained by Lambda.
         Theta_explained = Lambda_hat_new_inv + sigma2_n*eye(d);
@@ -230,10 +257,10 @@ for i = 1:length(lambda) % Try different magnitudes of lambda.
 %             rank(WWt_hat_new), lml_new_rca);
         figure(2), plot(k+.5, lml_new_rca,'.r', k, lml_new_em,'.b'), hold on
         
-        % Error check.
+        % RCA error check.
         if lml_new_rca < lml_new_em
             warning([num2str(lml_new_rca - lml_new_em) ' lml drop observed after RCA iteration!']);
-            pause;
+            break;
         end
         
         % Convergence / error check.
@@ -250,15 +277,15 @@ for i = 1:length(lambda) % Try different magnitudes of lambda.
         % Prepare for new iteration.
         lml_old = lml_new_rca;
         warmInit = true;
-        Lambda_hat_old = Lambda_hat_new;    WWt_hat_old = WWt_hat_new;
+        Lambda_hat_old = Lambda_hat_new;    WWt_hat_old = WWt_hat_new;  Sigma_hat_old = Sigma_hat_new;
         k = k + 1;
         
         % Plot results of this iteration.
-%         figure(5), clf, colormap('hot')
-%         subplot(131), imagesc(Lambda_hat_new), colorbar
-%             title([ 'GLasso/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
-%         subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
-%         subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
+        figure(5), clf, colormap('hot')
+        subplot(131), imagesc(Lambda_hat_new), colorbar
+            title([ 'GLasso/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
+        subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
+        subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
     end
     
     % Plot results.
