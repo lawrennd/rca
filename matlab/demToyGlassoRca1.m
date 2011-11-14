@@ -22,8 +22,8 @@ figure(3), clf, colormap('hot')
 figure(4), clf, colormap('hot')
 figure(5), clf, colormap('hot')
 
-limit = 1e-5;
-lambda = 5.^linspace(-8,3,30);
+limit = 1e-3;
+lambda = 2.^linspace(-8,3,30);
 Sigma_hat = cell(length(lambda),1);
 Lambda_hat = cell(length(lambda),1);
 triuLambda_hat = cell(length(lambda),1);
@@ -70,10 +70,8 @@ subplot(131), imagesc(Lambda), title('sparse \Lambda'), colorbar
 subplot(132), imagesc(Sigma), title('sparse-inverse \Sigma'), colorbar
 subplot(133), imagesc(WWt), title('Low-rank WW'''), colorbar
 
-
 Y = Y - repmat(mean(Y),n,1);
-Cy = Y'*Y/n; % Sample covariance Y.
-% totalvar = trace(Cy)/d;
+Cy = Y' * Y /n;
 %}
 
 
@@ -85,17 +83,23 @@ AUCs = zeros(2,1); figure(2), clf, figure(4), clf
 for c = 1:2
     s = RandStream('mcg16807','Seed', 666); RandStream.setDefaultStream(s) % 23, 1e5
     Y_ = gaussSamp(confounders{c} + Sigma + sigma2_n*eye(d), n);   Y_ = Y_ - repmat(mean(Y_),n,1);
-    Cy_ = Y_'*Y_/n;
+    Cy_ = Y_' * Y_/n;
+	nonZero = find(ones(d));    % To induce any prior knowledge of non-zeros. Typically all ones.
+    warmLambda_hat = Lambda; % eye(d);
+    funObj = @(x)sparsePrecisionObj(x, d, nonZero, Cy_);
+    options.verbose = 1;    options.order = -1;
     A = boolean( triu(Lambda,1) ~= 0 );
     for i = 1:length(lambda)
-        [Sigma_hat{i}, Lambda_hat{i}] = ...
-                glasso( d, Cy_, 0, lambda(i)*ones(d), ...   % numVars, empirical covariance, computePath, regul.matrix
-                0, 0, 0, 1, ...                             % approximate, warmInit, verbose, penalDiag
-                1e-4, 1e4, ...                              % tolThreshold (1e-4), maxIter (1e4)
-                zeros(d), zeros(d));                        % warmLambda, warmSigma
+        Lambda_hat{i} = eye(d);
+        Lambda_hat{i}(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda(i)*ones(d*d,1), options);
+        %         [Sigma_hat{i}, Lambda_hat{i}] = ...
+        %                 glasso( d, Cy_, 0, lambda(i)*ones(d), ...   % numVars, empirical covariance, computePath, regul.matrix
+        %                 0, 0, 0, 1, ...                             % approximate, warmInit, verbose, penalDiag
+        %                 1e-4, 1e4, ...                              % tolThreshold (1e-4), maxIter (1e4)
+        %                 zeros(d), zeros(d));                        % warmLambda, warmSigma
         triuLambda_hat{i} = triu(Lambda_hat{i}, 1);
         figure(3), imagesc(Lambda_hat{i}), colormap(hot), colorbar,...
-            title([ '(RCA)GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
+            title([ 'GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
         % Evaluation
         B{i} = boolean( triuLambda_hat{i} ~= 0 );
         TPs(i) = sum( A(:) & B{i}(:) );
@@ -130,26 +134,32 @@ figure(4), clf, imagesc(WWt_hat - WWt), title('WW''-WWt_hat'), colorbar;
 %% Recovery of sparse-inverse and low-rank covariance via iterative
 % application of GLASSO and RCA.
 
-lambda = 10^-2.6;
-for i = 1:length(lambda) % Try different magnitudes of lambda.
+lambda = 10^-3;             % !!! 10^-2.6 shows no anomallies. 10^-1 indicates a bug from iteration 1. !!!
+for i = 1:length(lambda)    % Try different magnitudes of lambda.
     
     % Initialise W with a PPCA low-rank estimate.
 %     [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');
 %     W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 
 %     W_hat_old = zeros(d,p);
-    W_hat_old = W;  % True low-rank.
+    W_hat_old = W;  % Use the true low-rank.
     
     WWt_hat_old = W_hat_old * W_hat_old';
     
-%     Lambda_hat_old = zeros(d);
+%     Lambda_hat_old = eye(d);
     Lambda_hat_old = Lambda;
     Sigma_hat_old = pdinv(Lambda);
-    
+    Lambda_hat_new = eye(d);
+    Sigma_hat_new = eye(d);
+
+    nonZero = find(ones(d));    % To induce any prior knowledge of non-zeros. Typically all ones.
+    options.order = -1;         % -1: L-BFGS (limited-memory), 1: BFGS (full-memory), 2: Newton
+    options.verbose = 1;
     warmInit = true;
     figure(2), clf
     k = 1;
     lml_old = -Inf;
+    lowerBound_m = -Inf;
     converged = false;
     while ~converged
         fprintf('\nEM-RCA iteration: %d\n', k);
@@ -177,15 +187,26 @@ for i = 1:length(lambda) % Try different magnitudes of lambda.
 
             % Variational lower bound after E step. *Should equal the lml*.
             [lowerBound_e, Q_e, H_e] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_old);
+            Theta_hat = WWt_hat_old + sigma2_n*eye(d) + pdinv(Lambda_hat_old);
+            lml_new_e = computeLogMarginalLikelihood(Cy, n, d, Theta_hat);
+            %             lml_new_e = -log(2*pi)*d*n/2 - log(det(Theta_hat))*n/2 - sum(sum((Y'*Y)'.*pdinv(Theta_hat)))/2;
+            if (abs(lml_new_e - lowerBound_e) > 1e-9)
+                warning([num2str(lml_new_e - lowerBound_e) ' significant difference between LML and LB_e after this E step !']); %#ok<*WNTAG>
+            end
+            if (lowerBound_m > lowerBound_e)
+                warning([num2str(lowerBound_e - lowerBound_m) ' drop of the LB after this E step !']);
+                break
+            end
             
             % M step. Maximise p(f|Lambda) wrt Lambda, via GLASSO.
-            %         fprintf('\nEmpirical covariance for GLasso\n rank: %d cond: %f\n\n', rank(Avg_E_fft), cond(Avg_E_fft))
             warmLambda_hat = Lambda_hat_old;    warmSigma_hat = Sigma_hat_old;
-            [Sigma_hat_new, Lambda_hat_new, iter, avgTol, hasError] = ...
-                glasso ( d, Avg_E_fft, 0, lambda(i).*ones(d), ...   % numVars, empirical covariance, computePath, regul.matrix
-                0, warmInit, 1, 1, ...  % approximate, warmInit, verbose, penalDiag
-                1e-8, 1e2, ...          % tolThreshold (1e-4), maxIter (1e2)
-                warmSigma_hat, warmLambda_hat);
+            %             [Sigma_hat_new, Lambda_hat_new, iter, avgTol, hasError] = ...
+            %                 glasso ( d, Avg_E_fft, 0, lambda(i).*ones(d), ...   % numVars, empirical covariance, computePath, regul.matrix
+            %                 0, warmInit, 1, 1, ...  % approximate, warmInit, verbose, penalDiag
+            %                 1e-4, 1e2, ...          % tolThreshold (1e-4), maxIter (1e2)
+            %                 warmSigma_hat, warmLambda_hat );
+            funObj = @(x)sparsePrecisionObj(x, d, nonZero, Avg_E_fft);
+            Lambda_hat_new(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda*ones(d*d,1), options);
             %             if any(asym(Lambda_hat_new))
             %             warning([ 'GLasso produced asymmetric Lambda_hat_new by ',...
             %                 num2str(asym(Lambda_hat_new)), '. Lambda_hat_new not symmetrified.' ]);
@@ -193,19 +214,36 @@ for i = 1:length(lambda) % Try different magnitudes of lambda.
             %             end
             Lambda_hat_new_inv = pdinv(Lambda_hat_new);
             
-            % Variational lower bound after M step. *Should be less than the lml*.
-            [lowerBound_m, Q_m, H_m] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_old);
-            
+            % Variational lower bound after M step. *Should be less than the lml and increased*.
+            [lowerBound_m, Q_m, H_m] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_new);
+                        
             % EM feedback.
             Theta_hat = WWt_hat_old + sigma2_n*eye(d) + Lambda_hat_new_inv;
-            lml_new_em = -log(2*pi)*d*n/2 - log(det(Theta_hat))*n/2 - sum(sum((Y'*Y)'.*pdinv(Theta_hat)))/2;
-            fprintf(['GLasso:\n GLasso iterations: %d\n '...
-                ... % 'Lambda_hat_new assymetry: %f\n ' ...
-                'avgTol: %e\n hasError: %d\n lambda: %e\n lml_new after EM: %e\n'], ...
-                iter, ...
-                ... % asym(Lambda_hat_new), ...
-                avgTol, hasError, lambda(i), lml_new_em);
-            figure(2), plot(k, lml_new_em,'.b'), hold on
+            lml_new_em = computeLogMarginalLikelihood(Cy, n, d, Theta_hat);
+            %             lml_new_em = -log(2*pi)*d*n/2 - log(det(Theta_hat))*n/2 - sum(sum((Y'*Y)'.*pdinv(Theta_hat)))/2;
+            if (lml_new_em < lowerBound_m)
+                warning([num2str(lml_new_em - lowerBound_e) ' LML smaller than LB_m after this M step !']);
+                break
+            end
+            if (lowerBound_e > lowerBound_m)
+                warning([num2str(lowerBound_m - lowerBound_e) ' LB_m smaller than LB_e after this M step !']);
+                %                 break
+            end
+            
+            fprintf( ['GLasso:\n ' ...
+                ... 'GLasso iterations: %d\n '...
+                ... 'Lambda_hat_new assymetry: %f\n ' ...
+                ... 'avgTol: %e\n hasError: %d\n '...
+                'lambda: %e\n lml_new after EM: %f\n'], ...
+                ... iter, ...
+                ... asym(Lambda_hat_new), ...
+                ... avgTol, hasError, ...
+                lambda(i), lml_new_em );
+            figure(2), plot( k, lml_new_em,'.b', ...
+                k-.1, lml_new_e,'.b', ...
+                k-.2, lowerBound_m,'.g', ...
+                k-.3, lowerBound_e,'.g'), hold on
+
             
             
             

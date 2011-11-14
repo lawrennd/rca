@@ -496,6 +496,8 @@ fprintf('Fitting full Gaussian graphical model\n');
 Kfull(nonZero) = minFunc(funObj,Kfull(nonZero),options);
 
 % Train GGM w/ L1-regularization
+sigma_emp = cov(X);
+nonZero = find(ones(nNodes));
 funObj = @(x)sparsePrecisionObj(x,nNodes,nonZero,sigma_emp);
 Ksparse = eye(nNodes);
 fprintf('Fitting sparse Gaussian graphical model\n');
@@ -511,7 +513,7 @@ title('Estimated Sparse Precision Matrix');
 % pause;
 
 %% Markov Random Field Structure Learning
-
+%{
 lambda = 5;
 
 % Generate Data
@@ -565,9 +567,10 @@ figure(fig);fig=fig+1;
 drawGraph(adjFinal);
 title('Estimated Structure');
 pause
+%}
 
 %% Neural Network with Sparse Connections
-
+%{
 fig = 100;
 lambda = 1;
 options.maxIter = 100;
@@ -665,9 +668,10 @@ figure(fig);fig=fig+1;
 drawGraph(adj,'labels',labels);
 title('Neural Network');
 pause
+%}
 
 %% Deep Network with Sparse Connections
-
+%{
 fig = 1000;
 lambda = 1;
 options.maxIter = 100; % Decrease iteration limit
@@ -767,3 +771,4 @@ labels{end,1} = 'y';
 figure(fig);fig=fig+1;
 drawGraph(adj,'labels',labels);
 title('Neural Network');
+%}
