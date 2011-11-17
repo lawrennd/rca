@@ -1,5 +1,5 @@
-clear all 
-close all
+% clear all 
+% close all
 
 fig = 1;
 
@@ -458,7 +458,7 @@ pause;
 %}
 %% Graphical Lasso
 
-lambda = .05;
+lambda = .1;
 nInstances = 100;
 options.order = -1;
 
@@ -478,6 +478,7 @@ mu = randn(nNodes,1);
 
 % Sample from the GGM
 C = inv(X);
+
 R = chol(C)';
 X = zeros(nInstances,nNodes);
 for i = 1:nInstances
@@ -488,27 +489,38 @@ end
 X = standardizeCols(X);
 
 % Train Full GGM
-sigma_emp = cov(X);
-nonZero = find(ones(nNodes));
-funObj = @(x)sparsePrecisionObj(x,nNodes,nonZero,sigma_emp);
-Kfull = eye(nNodes);
-fprintf('Fitting full Gaussian graphical model\n');
-Kfull(nonZero) = minFunc(funObj,Kfull(nonZero),options);
+% sigma_emp = cov(X); sigma_emp = Avg_E_fft;
+% nonZero = find(ones(nNodes));
+% funObj = @(x)sparsePrecisionObj(x,nNodes,nonZero,sigma_emp);
+% Kfull = eye(nNodes);
+% fprintf('Fitting full Gaussian graphical model\n');
+% Kfull_new = eye(nNodes);
+% Kfull_new(nonZero) = minFunc(funObj,Kfull(nonZero),options);
+% [funObj(Kfull), funObj(Kfull_new)]
+% [log(det(Kfull)) - sum(sum(sigma_emp.*Kfull)), log(det(Kfull_new)) - sum(sum(sigma_emp.*Kfull_new))]
+
+
 
 % Train GGM w/ L1-regularization
-sigma_emp = cov(X);
+sigma_emp = cov(X); sigma_emp = Avg_E_fft;
 nonZero = find(ones(nNodes));
 funObj = @(x)sparsePrecisionObj(x,nNodes,nonZero,sigma_emp);
 Ksparse = eye(nNodes);
 fprintf('Fitting sparse Gaussian graphical model\n');
-Ksparse(nonZero) = L1GeneralProjection(funObj,Ksparse(nonZero),lambda*ones(nNodes*nNodes,1),options);
+Ksparse_new = eye(nNodes);
+Ksparse_new(nonZero) = L1GeneralProjection(funObj,Ksparse(nonZero),lambda*ones(nNodes*nNodes,1),options);
+[funObj(Ksparse), funObj(Ksparse_new)]
+[log(det(Ksparse)) - sum(sum(sigma_emp.*Ksparse)), log(det(Ksparse_new)) - sum(sum(sigma_emp.*Ksparse_new))]
 
 figure(fig);fig=fig+1;
-subplot(1,2,1);
-imagesc(Kfull);
+subplot(1,3,1);
+imagesc(inv(C)), colorbar;
+title('True Precision Matrix')
+subplot(1,3,2);
+imagesc(Kfull_new), colorbar;
 title('Estimated Full Precision Matrix');
-subplot(1,2,2);
-imagesc(Ksparse);
+subplot(1,3,3);
+imagesc(Ksparse_new), colorbar;
 title('Estimated Sparse Precision Matrix');
 % pause;
 
