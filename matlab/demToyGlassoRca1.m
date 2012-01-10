@@ -28,14 +28,9 @@ Sigma_hat = cell(length(lambda),1);
 Lambda_hat = cell(length(lambda),1);
 triuLambda_hat = cell(length(lambda),1);
 B = cell(length(lambda),1);
-TPs = zeros(length(lambda), 1);
-FPs = zeros(length(lambda), 1);
-FNs = zeros(length(lambda), 1);
-TNs = zeros(length(lambda), 1);
-
+pstats = zeros(length(lambda), 4);
 
 %% Data generation.
-
 d = 50; % Observed dimensions.
 p = 3;  % Low-rank
 n = 100;
@@ -55,7 +50,6 @@ Lambda = Lambda + Lambda';          % Symmetrify.
 pd = 1; diagonal = eye(d);
 while pd > 0
     testLambda = Lambda + diagonal;
-%     testLambda = Lambda + diag(abs(randn(d,1))).*4; % 4
     [~, pd] = chol(testLambda);
     diagonal = diagonal*2;
 end
@@ -72,7 +66,6 @@ subplot(133), imagesc(WWt), title('Low-rank WW'''), colorbar
 
 Y = Y - repmat(mean(Y),n,1);
 Cy = Y' * Y /n;
-%}
 
 
 %% Standard Glasso on (un)confounded simulated data, with varying lambda.
@@ -136,25 +129,22 @@ figure(4), clf, imagesc(WWt_hat - WWt), title('WW''-WWt_hat'), colorbar;
 
 % lambda = 10^-2;           % 10^-2 too strong
 for i = 1:length(lambda)    % Try different magnitudes of lambda.
-    
-    % Initialise W with a PPCA low-rank estimate.
+    %% Initialise W with a PPCA low-rank estimate.
     [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');
     W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
-
-%     W_hat_old = zeros(d,p);
-%     W_hat_old = W;  % Use the true low-rank.
-    
+        %     W_hat_old = zeros(d,p);
+        %     W_hat_old = W;  % Use rue low-rank.
     WWt_hat_old = W_hat_old * W_hat_old';
-    
-%     Lambda_hat_old = Lambda;    Sigma_hat_old = pdinv(Lambda);
+        %     Lambda_hat_old = Lambda;    Sigma_hat_old = pdinv(Lambda);
     Lambda_hat_old = eye(d);    Sigma_hat_old = pdinv(Lambda);
-    Lambda_hat_new = eye(d);    Sigma_hat_new = eye(d);
-    
+        %     Lambda_hat_new = eye(d);    Sigma_hat_new = eye(d);
+
+%{    
+    figure(2), clf
     nonZero = find(ones(d));    % To induce any prior knowledge of zeros. Typically all ones.
     options.order = -1;         % -1: L-BFGS (limited-memory), 1: BFGS (full-memory), 2: Newton
     options.verbose = 0;
     warmInit = true;
-    figure(2), clf
     k = 1;
     lml_old = -Inf;
     lowerBound_m = -Inf;
@@ -244,9 +234,9 @@ for i = 1:length(lambda)    % Try different magnitudes of lambda.
         %% RCA feedback
         Theta_hat = WWt_hat_new + Lambda_hat_new_inv + sigma2_n*eye(d);
         lml_new_rca = computeLogMarginalLikelihood(Cy, n, d, Theta_hat, Lambda_hat_new, lambda(i));
-%         -log(2*pi)*d*n/2 - log(det(Theta_hat))*n/2 - sum(sum((Y'*Y)'.*pdinv(Theta_hat)))/2 - (lambda(i) * sum(abs(Lambda_hat_new(:))))*n/2
-%         fprintf('RCA:\n rank(WWt_hat_new): %d\n lml_new after RCA: %f\n\n', ...
-%             rank(WWt_hat_new), lml_new_rca);
+            %         -log(2*pi)*d*n/2 - log(det(Theta_hat))*n/2 - sum(sum((Y'*Y)'.*pdinv(Theta_hat)))/2 - (lambda(i) * sum(abs(Lambda_hat_new(:))))*n/2
+            %         fprintf('RCA:\n rank(WWt_hat_new): %d\n lml_new after RCA: %f\n\n', ...
+            %             rank(WWt_hat_new), lml_new_rca);
         figure(2), plot(k+.5, lml_new_rca,'.r', k, lml_new_em,'.b'), hold on
         
         % RCA error check.
@@ -279,30 +269,35 @@ for i = 1:length(lambda)    % Try different magnitudes of lambda.
             %         subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
             %         subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
     end
+%}
+    
+    [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, n, lambda(i), limit);
     
     % Plot results.
     figure(5), clf, colormap('hot')
-    subplot(131), imagesc(Lambda_hat_new), colorbar
-        title([ 'GLasso/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
+    subplot(131), imagesc(Lambda_hat_new), colorbar, title([ 'GLasso/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
     subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
     WWt_hat_new(WWt_hat_new > max(WWt(:))) = max(WWt(:));   WWt_hat_new(WWt_hat_new < min(WWt(:))) = min(WWt(:));
     subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
+
+    % Performance stats. Row format in pstats : [ TP FP FN TN ].
+    pstats(i,:) = performanceStats(Lambda, Lambda_hat_new);
     
-    % Performance stats.
-    A = boolean(triu(Lambda,1) ~= 0);
-    triuLambda_hat{i} = triu(Lambda_hat_new, 1);
-    B{i} = boolean( triuLambda_hat{i} ~= 0 );
-    TPs(i) = sum( A(:) & B{i}(:) );
-    FPs(i) = sum( ~A(:) & B{i}(:) );
-    FNs(i) = sum( A(:) & ~B{i}(:) );
-    TNs(i) = sum( ~A(:) & ~B{i}(:) );
+        %{
+            A = boolean(triu(Lambda,1) ~= 0);   % Binary matrix indicating dges in the ground truth Lambda.
+            triuLambda_hat{i} = triu(Lambda_hat_new, 1);
+            B{i} = boolean( triuLambda_hat{i} ~= 0 );   % Edges in the estimated Lambda.
+            TPs(i) = pstats.TP;
+            FPs(i) = pstats.FP;
+            FNs(i) = pstats.FN;
+            TNs(i) = pstats.TN;
+        %}
 end
 Recalls = TPs ./ (TPs + FNs);
 Precisions = TPs ./ (TPs + FPs);
 FPRs = FPs ./ (FPs + TNs);
 AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
+
 figure(3), hold on, plot(Recalls, Precisions, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), title('Recall-Precision')
 figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR')
 legend([ 'RCA-GLasso auc: ' num2str(AUC) ], 4), title('ROC');
-%}
-
