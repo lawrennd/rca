@@ -45,7 +45,7 @@ while ~converged
     [lowerBound_e,~,~] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_old, lambda);
     Theta_hat = WWt_hat_old + sigma2_n*eye(d) + pdinv(Lambda_hat_old);
     lml_new_e = computeLogMarginalLikelihood(Cy, n, d, Theta_hat, Lambda_hat_old, lambda);
-    if (abs(lml_new_e - lowerBound_e) > 1e-9)
+    if (abs(lml_new_e - lowerBound_e) > 1e-8)
         warning([num2str(lml_new_e - lowerBound_e) ' significant difference between LML and LB_e after this E step !']); %#ok<*WNTAG>
     end
     if (lowerBound_m > lowerBound_e)
@@ -81,7 +81,7 @@ while ~converged
         warning([num2str(lml_new_em - lowerBound_e) ' LML smaller than LB_m after this M step !']);
         break
     end
-    if (lowerBound_e > lowerBound_m)
+    if (lowerBound_m - lowerBound_e < -1e-9)
         warning([num2str(lowerBound_m - lowerBound_e) ' LB_m smaller than LB_e after this M step !']);
         break
     end
@@ -119,7 +119,7 @@ while ~converged
     %     figure(2), plot(k+.5, lml_new_rca,'.r', k, lml_new_em,'.b'), hold on
     
     % RCA error check.
-    if lml_new_rca < lml_new_em
+    if (lml_new_rca - lml_new_em < -1e-9)
         warning([num2str(lml_new_rca - lml_new_em) ' lml drop observed after RCA iteration!']);
         break;
     end

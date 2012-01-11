@@ -1,4 +1,4 @@
-function pstats = performanceStats(Lambda, Lambda_hat_new)
+function pstats = emrcaRocStats(Lambda, Lambda_hat_new)
 
 % PERFORMANCESTATS Takes the estimated and ground truth inverse-covariance
 % and computes basic statistics required for plotting ROC and
@@ -24,4 +24,3 @@ FP = sum( ~A(:) & B(:) );
 FN = sum( A(:) & ~B(:) );
 TN = sum( ~A(:) & ~B(:) );
 pstats = [ TP FP FN TN ];
-

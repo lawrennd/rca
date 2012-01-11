@@ -16,19 +16,16 @@ addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 importTool({'rca','ndlutil','gprege'})
 asym = @(x) sum(sum(abs(x - x.'))); % Asymmetry test.
 
-figure(1), clf, colormap('hot')
-figure(2), clf, colormap('hot')
-figure(3), clf, colormap('hot')
-figure(4), clf, colormap('hot')
+figure(1), clf, colormap('hot');    figure(2), clf, colormap('hot')
+figure(3), clf, colormap('hot');    figure(4), clf, colormap('hot')
 figure(5), clf, colormap('hot')
 
 limit = 1e-4;
 lambda = 5.^linspace(-8,3,30);
-Sigma_hat = cell(length(lambda),1);
-Lambda_hat = cell(length(lambda),1);
+Sigma_hat = cell(length(lambda),1); Lambda_hat = cell(length(lambda),1);
 triuLambda_hat = cell(length(lambda),1);
 B = cell(length(lambda),1);
-pstats = zeros(length(lambda), 4);
+rocstats = zeros(length(lambda), 4);
 
 %% Data generation.
 d = 50; % Observed dimensions.
@@ -66,7 +63,6 @@ subplot(133), imagesc(WWt), title('Low-rank WW'''), colorbar
 
 Y = Y - repmat(mean(Y),n,1);
 Cy = Y' * Y /n;
-
 
 %% Standard Glasso on (un)confounded simulated data, with varying lambda.
 %{
@@ -281,7 +277,7 @@ for i = 1:length(lambda)    % Try different magnitudes of lambda.
     subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
 
     % Performance stats. Row format in pstats : [ TP FP FN TN ].
-    pstats(i,:) = performanceStats(Lambda, Lambda_hat_new);
+    rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new);
     
         %{
             A = boolean(triu(Lambda,1) ~= 0);   % Binary matrix indicating dges in the ground truth Lambda.
@@ -293,11 +289,9 @@ for i = 1:length(lambda)    % Try different magnitudes of lambda.
             TNs(i) = pstats.TN;
         %}
 end
-Recalls = TPs ./ (TPs + FNs);
-Precisions = TPs ./ (TPs + FPs);
-FPRs = FPs ./ (FPs + TNs);
-AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
+TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3); TNs = rocstats(:,4); 
+Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
+FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
 
 figure(3), hold on, plot(Recalls, Precisions, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), title('Recall-Precision')
-figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR')
-legend([ 'RCA-GLasso auc: ' num2str(AUC) ], 4), title('ROC');
+figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'RCA-GLasso auc: ' num2str(AUC) ], 4), title('ROC');
