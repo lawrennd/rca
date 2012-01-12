@@ -1,4 +1,4 @@
-function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, n, lambda, limit)
+function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda, nonZero, limit, showProgress)
 
 % EMRCA Learns an additive Gaussian model, made of a low-rank and a
 % sparse component, through a hybrid EM-RCA iterative algorithm. The M step
@@ -16,10 +16,10 @@ function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_ol
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative
 % application of EM (with GLASSO) and RCA.
-d = size(WWt_hat_old, 1);
+[n, d] = size(Y);
 Cy = Y' * Y /n;
 Lambda_hat_new = eye(d);
-nonZero = find(ones(d));    % To induce any prior knowledge of zeros. Typically all ones.
+    % nonZero = find(ones(d));    % To induce any prior knowledge of zeros. Typically all ones.
 options.order = -1;         % -1: L-BFGS (limited-memory), 1: BFGS (full-memory), 2: Newton
 options.verbose = 0;
     % warmInit = true;
@@ -81,7 +81,7 @@ while ~converged
         warning([num2str(lml_new_em - lowerBound_e) ' LML smaller than LB_m after this M step !']);
         break
     end
-    if (lowerBound_m - lowerBound_e < -1e-9)
+    if (lowerBound_m - lowerBound_e < -1e-6) % !!! too high?
         warning([num2str(lowerBound_m - lowerBound_e) ' LB_m smaller than LB_e after this M step !']);
         break
     end
@@ -97,12 +97,12 @@ while ~converged
                         lambda(i), lml_new_em );
         %}
     
-    %{
-    figure(2), plot( k, lml_new_em,'.b', ...
-        k-.1, lml_new_e,'.b', ...
-        k-.2, lowerBound_m,'.g', ...
-        k-.3, lowerBound_e,'.g'), hold on
-    %}
+    if showProgress
+        figure(2), plot( k, lml_new_em,'.b', ...
+            k-.1, lml_new_e,'.b', ...
+            k-.2, lowerBound_m,'.g', ...
+            k-.3, lowerBound_e,'.g'), hold on
+    end
     
     %% RCA step: Maximisation of p(y) wrt to W, Cy partially explained by Lambda.
     Theta_explained = Lambda_hat_new_inv + sigma2_n*eye(d);
@@ -116,7 +116,9 @@ while ~converged
         %         fprintf('RCA:\n rank(WWt_hat_new): %d\n lml_new after RCA: %f\n\n', ...
         %             rank(WWt_hat_new), lml_new_rca);
         
-    %     figure(2), plot(k+.5, lml_new_rca,'.r', k, lml_new_em,'.b'), hold on
+    if showProgress
+        figure(2), plot(k+.5, lml_new_rca,'.r', k, lml_new_em,'.b'), hold on
+    end
     
     % RCA error check.
     if (lml_new_rca - lml_new_em < -1e-9)
@@ -125,7 +127,7 @@ while ~converged
     end
     % Convergence / error check.
     if (lml_new_rca - lml_old) < limit
-        if lml_old > lml_new_rca
+        if (lml_new_rca - lml_old < -1e-6) % !!! too high?
             warning([num2str(lml_new_rca - lml_old) ' lml drop observed after this iteration!']);
             break
         else

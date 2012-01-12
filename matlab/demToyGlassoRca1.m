@@ -26,6 +26,7 @@ Sigma_hat = cell(length(lambda),1); Lambda_hat = cell(length(lambda),1);
 triuLambda_hat = cell(length(lambda),1);
 B = cell(length(lambda),1);
 rocstats = zeros(length(lambda), 4);
+showProgress = 0;
 
 %% Data generation.
 d = 50; % Observed dimensions.
@@ -56,13 +57,14 @@ W = randn(d,p);
 WWt = W*W';
 Theta = WWt + Sigma + sigma2_n*eye(d);
 Y = gaussSamp(Theta, n);
+Y = Y - repmat(mean(Y),n,1);
+Cy = Y' * Y /n;
+nonZero = find(ones(d));    % Induce any prior knowledge of zeros. If not, this is all ones.
+
 figure(1), clf, colormap('hot')
 subplot(131), imagesc(Lambda), title('sparse \Lambda'), colorbar
 subplot(132), imagesc(Sigma), title('sparse-inverse \Sigma'), colorbar
 subplot(133), imagesc(WWt), title('Low-rank WW'''), colorbar
-
-Y = Y - repmat(mean(Y),n,1);
-Cy = Y' * Y /n;
 
 %% Standard Glasso on (un)confounded simulated data, with varying lambda.
 %{
@@ -107,7 +109,6 @@ figure(2), legend(legends,1), title('Recall-Precision');
 figure(4), legend([ legends{1} ' auc: ' num2str(AUCs(1)) ], [ legends{2} ' auc: ' num2str(AUCs(2)) ], 4), title('ROC');
 %}
 
-
 %% Recovery of low-rank component WWt by explaining away the true
 % sparse-inverse covariance Sigma.
 %{
@@ -119,13 +120,12 @@ figure(3), clf, imagesc(WWt_hat), colorbar, title('WW'' by RCA');
 figure(4), clf, imagesc(WWt_hat - WWt), title('WW''-WWt_hat'), colorbar;
 %}
 
-
 %% Recovery of sparse-inverse and low-rank covariance via iterative
 % application of GLASSO and RCA.
 
-% lambda = 10^-2;           % 10^-2 too strong
 for i = 1:length(lambda)    % Try different magnitudes of lambda.
     %% Initialise W with a PPCA low-rank estimate.
+    sigma2_n = 0.1 * trace(Cy)/d;        % Noise variance. (0.1)
     [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');
     W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
         %     W_hat_old = zeros(d,p);
@@ -267,7 +267,7 @@ for i = 1:length(lambda)    % Try different magnitudes of lambda.
     end
 %}
     
-    [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, n, lambda(i), limit);
+    [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, showProgress);
     
     % Plot results.
     figure(5), clf, colormap('hot')
@@ -278,7 +278,6 @@ for i = 1:length(lambda)    % Try different magnitudes of lambda.
 
     % Performance stats. Row format in pstats : [ TP FP FN TN ].
     rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new);
-    
         %{
             A = boolean(triu(Lambda,1) ~= 0);   % Binary matrix indicating dges in the ground truth Lambda.
             triuLambda_hat{i} = triu(Lambda_hat_new, 1);
@@ -289,9 +288,18 @@ for i = 1:length(lambda)    % Try different magnitudes of lambda.
             TNs(i) = pstats.TN;
         %}
 end
+
+%% Process performances measures.
 TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3); TNs = rocstats(:,4); 
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
 
+%% Plot performance.
 figure(3), hold on, plot(Recalls, Precisions, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), title('Recall-Precision')
+text(Recalls, Precisions, num2cell(lambda))
+GLxy  = [1,0; 0.933,0; 0.866,0.025; 0.8,0.03; 0.8,0.04; 0.75,0.05;  0.6,0.06; 0.525,0.08; 0.4,0.1; 0.25,0.08; 0.25,0.1; 0.125,0.09; 0.05,0.125; 0.05,0.066; 0.05,1];
+KGLxy = [1,0; 0.933,0; 0.8,0.01; 0.8,0.03; 0.733,0.04; 0.46,0.125; 0.41, 0.433; 0.2,0.6; 0.125,1];
+IGLxy = [1,0; 0.933,0; 0.866,0.133; 0.6,0.2; 0.45,0.325; 0.125,0.666; 0.05,1];
+plot(GLxy(:,1), GLxy(:,2), 'bo-', KGLxy(:,1), KGLxy(:,2), 'gx-', IGLxy(:,1), IGLxy(:,2), 'm.-')
+legend('EM-RCA','Glasso','Kr-Glasso','Ideal Glasso')
 figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'RCA-GLasso auc: ' num2str(AUC) ], 4), title('ROC');
