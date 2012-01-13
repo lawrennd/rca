@@ -125,7 +125,7 @@ figure(4), clf, imagesc(WWt_hat - WWt), title('WW''-WWt_hat'), colorbar;
 
 for i = 1:length(lambda)    % Try different magnitudes of lambda.
     %% Initialise W with a PPCA low-rank estimate.
-    sigma2_n = 0.1 * trace(Cy)/d;        % Noise variance. (0.1)
+    sigma2_n = 0.03 * trace(Cy)/d;        % Noise variance. (.025)
     [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');
     W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
         %     W_hat_old = zeros(d,p);
