@@ -1,8 +1,14 @@
-function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda, nonZero, limit, showProgress)
+function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda, nonZero, limit, options)
 
-% EMRCA Learns an additive Gaussian model, made of a low-rank and a
-% sparse component, through a hybrid EM-RCA iterative algorithm. The M step
-% is performed via Glasso optimisation.
+% EMRCA Learns an additive Gaussian model, whose covariance is composed of a low-rank and a
+% sparse inverse component, through a hybrid EM-RCA iterative algorithm. The M step
+% is done via the Glasso optimisation algorithm.
+% 
+% options:
+%   verbose: level of verbosity (0: no output, 1: iter (default))
+%   showProgress: plot lml function per iteration (0: no plotting, 1: plot lml)
+%   errorCheck: check for errors in convergence (0: no error checking, 1:
+%   check for errors)
 %
 % FORMAT
 % DESC
@@ -20,16 +26,20 @@ function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_ol
 Cy = Y' * Y /n;
 Lambda_hat_new = eye(d);
     % nonZero = find(ones(d));    % To induce any prior knowledge of zeros. Typically all ones.
-options.order = -1;         % -1: L-BFGS (limited-memory), 1: BFGS (full-memory), 2: Newton
-options.verbose = 0;
+L1GPoptions.order = -1;         % -1: L-BFGS (limited-memory), 1: BFGS (full-memory), 2: Newton
+L1GPoptions.verbose = 0;
     % warmInit = true;
-figure(2), clf
+if options.showProgress
+    figure(2), clf
+end
 k = 1;
 lml_old = -Inf;
 lowerBound_m = -Inf;
 converged = false;
 while ~converged
-    fprintf('\nEM-RCA iteration: %d\n', k);
+    if options.verbose
+        fprintf('\nEM-RCA iteration: %d\n', k);
+    end
     
     %% E step.
     WWt_plus_noise_inv = pdinv( WWt_hat_old + sigma2_n*eye(d) );
@@ -40,17 +50,20 @@ while ~converged
         %                 warning([ 'rank(Avg_E_fft) = ', num2str(rank(Avg_E_fft)) ]); %#ok<*WNTAG>
         %             end
 
-    %% Variational lower bound after E step. *Should equal the lml*.
-        %             [log(det(Lambda_hat_old))*n/2 - sum(sum(Avg_E_fft.*Lambda_hat_old))*n/2 - lambda*sum(abs(Lambda_hat_old(:)))*n/2]
-    [lowerBound_e,~,~] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_old, lambda);
-    Theta_hat = WWt_hat_old + sigma2_n*eye(d) + pdinv(Lambda_hat_old);
-    lml_new_e = computeLogMarginalLikelihood(Cy, n, d, Theta_hat, Lambda_hat_old, lambda);
-    if (abs(lml_new_e - lowerBound_e) > 1e-8)
-        warning([num2str(lml_new_e - lowerBound_e) ' significant difference between LML and LB_e after this E step !']); %#ok<*WNTAG>
-    end
-    if (lowerBound_m > lowerBound_e)
-        warning([num2str(lowerBound_e - lowerBound_m) ' drop of the LB after this E step !']);
-        break
+    if (options.errorCheck)
+        %% Variational lower bound after E step. *Should equal the lml*.
+            %             [log(det(Lambda_hat_old))*n/2 - sum(sum(Avg_E_fft.*Lambda_hat_old))*n/2 - lambda*sum(abs(Lambda_hat_old(:)))*n/2]
+        [lowerBound_e,~,~] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_old, lambda);
+        Theta_hat = WWt_hat_old + sigma2_n*eye(d) + pdinv(Lambda_hat_old);
+        lml_new_e = computeLogMarginalLikelihood(Cy, n, d, Theta_hat, Lambda_hat_old, lambda);
+        
+        if (abs(lml_new_e - lowerBound_e) > 1e-6) % too high?! was 1e-8
+            warning([num2str(lml_new_e - lowerBound_e) ' significant difference between LML and LB_e after this E step !']); %#ok<*WNTAG>
+        end
+        if (lowerBound_e - lowerBound_m < -1e-6)  % too high?! was 0
+            warning([num2str(lowerBound_e - lowerBound_m) ' drop of the LB after this E step !']);
+            break
+        end
     end
     
     %% M step. Maximise p(f|Lambda) wrt Lambda, via GLASSO.
@@ -62,7 +75,7 @@ while ~converged
         %                 warmSigma_hat, warmLambda_hat );
     funObj = @(x)sparsePrecisionObj(x, d, nonZero, Avg_E_fft);
         %             computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, warmLambda_hat, lambda)
-    Lambda_hat_new(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda*ones(d*d,1), options);
+    Lambda_hat_new(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda*ones(d*d,1), L1GPoptions);
         %             computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_new, lambda(i))
         %             if any(asym(Lambda_hat_new))
         %             warning([ 'GLasso produced asymmetric Lambda_hat_new by ',...
@@ -70,21 +83,35 @@ while ~converged
         %                 Lambda_hat_new = (Lambda_hat_new + Lambda_hat_new') ./ 2; %   Symmetrify.
         %             end
     Lambda_hat_new_inv = pdinv(Lambda_hat_new);
-    
-    %% Variational lower bound after M step. *Should be less than the lml and increased*.
-    [lowerBound_m,~,~] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_new, lambda);
-    
+        %     S = ( Y'*Y - Y'*E_f - E_f'*Y + n*Avg_E_fft ) ./ n;    % Optimise sigma numerically.
+        %     funObj_sigma = @(x)Ly_f(x, WWt_hat_old, S, n);
+        %     sigma2_n = minConf_TMP(funObj_sigma, sigma2_n, 0, trace(Cy), L1GPoptions);
+
     %% EM feedback.
-    Theta_hat = WWt_hat_old + sigma2_n*eye(d) + Lambda_hat_new_inv;
-    lml_new_em = computeLogMarginalLikelihood(Cy, n, d, Theta_hat, Lambda_hat_new, lambda);
-    if (lml_new_em - lowerBound_m < -1e-9)
-        warning([num2str(lml_new_em - lowerBound_e) ' LML smaller than LB_m after this M step !']);
-        break
+    if (options.errorCheck)
+        Theta_hat = WWt_hat_old + sigma2_n*eye(d) + Lambda_hat_new_inv;
+        lml_new_em = computeLogMarginalLikelihood(Cy, n, d, Theta_hat, Lambda_hat_new, lambda);
+        
+        % Variational lower bound after M step. *Should be less than the lml and increased*.
+        [lowerBound_m,~,~] = computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, Lambda_hat_new, lambda);
+        
+        if (lml_new_em - lowerBound_m < -1e-6)  % too high?! was -1e-9
+            warning([num2str(lml_new_em - lowerBound_e) ' LML smaller than LB_m after this M step !']);
+            break
+        end
+        if (lowerBound_m - lowerBound_e < -1e-6) % !!! too high?
+            warning([num2str(lowerBound_m - lowerBound_e) ' LB_m smaller than LB_e after this M step !']);
+            break
+        end
+        
+        if options.showProgress
+            figure(2),  hold on, plot(  k, lml_new_em,'.b', ...
+                k-.1, lml_new_e,'.b', ...
+                k-.2, lowerBound_m,'.g', ...
+                k-.3, lowerBound_e,'.g')
+        end
     end
-    if (lowerBound_m - lowerBound_e < -1e-6) % !!! too high?
-        warning([num2str(lowerBound_m - lowerBound_e) ' LB_m smaller than LB_e after this M step !']);
-        break
-    end
+    
         %{
                     fprintf( ['GLasso:\n ' ...
                         ... 'GLasso iterations: %d\n '...
@@ -96,14 +123,7 @@ while ~converged
                         ... avgTol, hasError, ...
                         lambda(i), lml_new_em );
         %}
-    
-    if showProgress
-        figure(2), plot( k, lml_new_em,'.b', ...
-            k-.1, lml_new_e,'.b', ...
-            k-.2, lowerBound_m,'.g', ...
-            k-.3, lowerBound_e,'.g'), hold on
-    end
-    
+
     %% RCA step: Maximisation of p(y) wrt to W, Cy partially explained by Lambda.
     Theta_explained = Lambda_hat_new_inv + sigma2_n*eye(d);
     [S D] = eig(Cy, Theta_explained);    [D perm] = sort(diag(D),'descend');
@@ -116,18 +136,19 @@ while ~converged
         %         fprintf('RCA:\n rank(WWt_hat_new): %d\n lml_new after RCA: %f\n\n', ...
         %             rank(WWt_hat_new), lml_new_rca);
         
-    if showProgress
-        figure(2), plot(k+.5, lml_new_rca,'.r', k, lml_new_em,'.b'), hold on
+    if (options.errorCheck) % RCA error check.
+        if options.showProgress
+            figure(2), plot(k+.5, lml_new_rca,'.r', k, lml_new_em,'.b'), hold on
+        end
+        if (lml_new_rca - lml_new_em < -1e-9)
+            warning([num2str(lml_new_rca - lml_new_em) ' lml drop observed after RCA iteration!']);
+            break;
+        end
     end
     
-    % RCA error check.
-    if (lml_new_rca - lml_new_em < -1e-9)
-        warning([num2str(lml_new_rca - lml_new_em) ' lml drop observed after RCA iteration!']);
-        break;
-    end
     % Convergence / error check.
     if (lml_new_rca - lml_old) < limit
-        if (lml_new_rca - lml_old < -1e-6) % !!! too high?
+        if (lml_new_rca - lml_old < -1e-6) % too high?!
             warning([num2str(lml_new_rca - lml_old) ' lml drop observed after this iteration!']);
             break
         else

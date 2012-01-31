@@ -13,7 +13,7 @@ clear, clc
 addpath(genpath('~/mlprojects/matlab/general/'))
 addpath(genpath('~/mlprojects/rca/matlab/glasso/'))
 addpath(genpath('~/mlprojects/rca/matlab/L1General'))
-importTool({'rca','ndlutil','gprege'})
+importTool({'rca','ndlutil'})
 asym = @(x) sum(sum(abs(x - x.'))); % Asymmetry test.
 
 figure(1), clf, colormap('hot');    figure(2), clf, colormap('hot')
@@ -122,10 +122,10 @@ figure(4), clf, imagesc(WWt_hat - WWt), title('WW''-WWt_hat'), colorbar;
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative
 % application of GLASSO and RCA.
-
-for i = 1:length(lambda)    % Try different magnitudes of lambda.
+tic
+parfor (i = 1:length(lambda), 8)    % Try different magnitudes of lambda.
     %% Initialise W with a PPCA low-rank estimate.
-    sigma2_n = 0.03 * trace(Cy)/d;        % Noise variance. (.025)
+    sigma2_n = 0.045 * trace(Cy)/d;        % Noise variance. (.045, .025)
     [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');
     W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
         %     W_hat_old = zeros(d,p);
@@ -288,6 +288,7 @@ for i = 1:length(lambda)    % Try different magnitudes of lambda.
             TNs(i) = pstats.TN;
         %}
 end
+toc
 
 %% Process performances measures.
 TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3); TNs = rocstats(:,4); 
