@@ -82,16 +82,16 @@ figure(4), clf, hold on, plot(FPRs, Recalls, '-xb'), xlim([0 1]), xlabel('FPR'),
 %}
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of GLASSO and RCA.
-sigma2_n = 1e-6 ; % 0.3 * trace(Cy)/d;        % Noise variance. (0.3)
+sigma2_n = 0.3 * trace(Cy)/d;        % Noise variance. (0.3)
 [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend'); % Initialise W with a PPCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 WWt_hat_old = W_hat_old * W_hat_old';
 
-for j = 1:1000
+% for j = 1:1000
 
 tic
 parfor (i = 1:length(lambda), 4)            % Try different magnitudes of lambda.
-    Lambda_hat_old = .01*j*eye(d);
+    Lambda_hat_old = eye(d); % *.01*j ;
 %     Lambda_hat_old(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda(i)*ones(d*d,1), options); % Initialise Lambda with a Glasso estimate.
     
     [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, emrca_options);
@@ -118,4 +118,4 @@ figure(3), hold on, plot3(Recalls, Precisions, repmat(j*.1,length(Recalls),1),'-
 hold on, plot([1,.87,.27],[.275,.26,.57], 'g-', [1,.67,.2], [.275,.3,.5], 'b-'), legend('EM-RCA','Kronecker-Glasso','Glasso') % literature performance
 figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'RCA-GLasso auc: ' num2str(AUC) ], 4), title('ROC');
 
-end
+% end

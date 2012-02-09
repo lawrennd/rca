@@ -1,4 +1,4 @@
-function [skeletons, channels] = collectSkeletonData(motionTypes, frac, continuous)
+function [skeletons, channels, xyzChannels] = collectSkeletonData(motionTypes, frac, continuous)
 
 names = {};
 subjects = [];
@@ -37,19 +37,22 @@ if nargin < 3 || isempty(continuous)
     continuous = true;
 end
 
-skeletons = cell(1,length(subjects));
-channels = cell(1,length(subjects));
+numSubjects = length(subjects);
+skeletons = cell(1, numSubjects);
+channels = cell(1, numSubjects);
+xyzChannels = cell(1, numSubjects);
 
-for i = 1:length(subjects)
+for i = 1:numSubjects
     iSub = subjects(i);
     fileNameAsf = sprintf('%02d.asf',iSub);
     if exist(fileNameAsf,'file')
-        fprintf('Loading subject %d ...(%d/%d)\n',iSub,i,length(subjects));
+        fprintf('Loading subject %d ...(%d/%d)\n',iSub,i,numSubjects);
         skel = acclaimReadSkel(fileNameAsf);
         skel.subcategory = names{i};
-        %         skeletons{i} = acclaimReadSkel(fileNameAsf);
-        for j = 1:length(trials{i})
-            fileNameAmc = sprintf('%02d_%02d.amc',iSub,j);
+        numTrials = length(trials{i});
+        for j = 1:numTrials
+            iTrial = trials{i}(j);
+            fileNameAmc = sprintf('%02d_%02d.amc',iSub,iTrial);
             if exist(fileNameAmc,'file')
                 numFramesInFile = acclaimNumberOfFrames(fileNameAmc);
                 numFramesToExtract = ceil(numFramesInFile*frac);
@@ -58,13 +61,19 @@ for i = 1:length(subjects)
                 else
                     iSubset = sort(randsample(numFramesInFile, numFramesToExtract));    % Subset of uniformly sampled and ordered frame numbers.
                 end
-                fprintf('\tLoading trial %02d_%02d.amc ...(%d/%d)\n',iSub,j,j,length(trials{i}));
+                fprintf('\tLoading trial %02d_%02d.amc ...(%d/%d)\n',iSub,iTrial,j,numTrials);
                 if frac < 1
                     fprintf('\t\tLoading only %d out of %d frames.\n', numFramesToExtract, numFramesInFile);
                 end
                 [channel, skeleton] = acclaimSemiLoadChannels(fileNameAmc, skel, iSubset);
-                channels{i} = [channels{i} {channel}];
                 skeletons{i} = [skeletons{i} {skeleton}];
+                channels{i} = [channels{i} {channel}];
+                numFrames = size(channel,1);
+                xyzChannel = zeros(numFrames, 93);
+                for iFrame = 1:numFrames;
+                    xyzChannel(iFrame,:) = reshape( acclaim2xyz(skeleton, channel(iFrame,:)), 1, []);
+                end
+                xyzChannels{i} = [xyzChannels{i} {xyzChannel}];
             end
         end
     end

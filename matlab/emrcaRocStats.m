@@ -1,4 +1,4 @@
-function pstats = emrcaRocStats(Lambda, Lambda_hat_new)
+function pstats = emrcaRocStats(Lambda, Lambda_hat_new, threshold)
 
 % PERFORMANCESTATS Takes the estimated and ground truth inverse-covariance
 % and computes basic statistics required for plotting ROC and
@@ -13,10 +13,14 @@ function pstats = emrcaRocStats(Lambda, Lambda_hat_new)
 %
 % RCA
 
+if nargin < 3 || isempty(threshold)
+    threshold = 0;
+end
+
 %% Performance stats.
 A = boolean(triu(Lambda,1) ~= 0);   % Binary matrix indicating dges in the ground truth Lambda.
 triuLambda_hat = triu(Lambda_hat_new, 1);
-B = boolean( triuLambda_hat ~= 0 );   % Edges in the estimated Lambda.
+B = boolean( abs(triuLambda_hat) > threshold);   % Edges in the estimated Lambda.
 
 %% Row format: [ TP FP FN TN ]
 TP = sum( A(:) & B(:) );
