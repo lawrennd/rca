@@ -1,8 +1,9 @@
-function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda, nonZero, limit, options)
+function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(...
+    Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda, nonZero, limit, options)
 
-% EMRCA Learns an additive Gaussian model, whose covariance is composed of a low-rank and a
-% sparse inverse component, through a hybrid EM-RCA iterative algorithm. The M step
-% is done via the Glasso optimisation algorithm.
+% EMRCA Through a hybrid EM-RCA iterative algorith, learns a Gaussian
+% model, whose covariance is composed of a low-rank and a sparse-inverse
+% component. The M step is done with the Glasso optimisation algorithm.
 % 
 % options:
 %   verbose: level of verbosity (0: no output, 1: iter (default))
@@ -68,11 +69,6 @@ while ~converged
     
     %% M step. Maximise p(f|Lambda) wrt Lambda, via GLASSO.
     warmLambda_hat = Lambda_hat_old;    % warmSigma_hat = Sigma_hat_old;
-        %             [Sigma_hat_new, Lambda_hat_new, iter, avgTol, hasError] = ...
-        %                 glasso ( d, Avg_E_fft, 0, lambda(i).*ones(d), ...   % numVars, empirical covariance, computePath, regul.matrix
-        %                 0, warmInit, 1, 1, ...  % approximate, warmInit, verbose, penalDiag
-        %                 1e-4, 1e2, ...          % tolThreshold (1e-4), maxIter (1e2)
-        %                 warmSigma_hat, warmLambda_hat );
     funObj = @(x)sparsePrecisionObj(x, d, nonZero, Avg_E_fft);
         %             computeLowerBound(Y, E_f, WWt_hat_old, Lambda_hat_old, sigma2_n, warmLambda_hat, lambda)
     Lambda_hat_new(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda*ones(d*d,1), L1GPoptions);

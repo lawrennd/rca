@@ -10,11 +10,10 @@
 %
 % RCA
 
-clear, clc
+clc
 addpath(genpath('~/mlprojects/matlab/general/'))
-addpath(genpath('~/mlprojects/rca/matlab/glasso/'))
-addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 importTool({'rca','ndlutil','datasets','mocap'})
+addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 s = RandStream('mcg16807','Seed', 1985); RandStream.setDefaultStream(s) % 1985
 
 figure(1), clf, colormap('hot');    figure(2), clf, colormap('hot')
