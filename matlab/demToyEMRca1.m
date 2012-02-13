@@ -27,7 +27,7 @@ triuLambda_hat = cell(length(lambda),1);
 B = cell(length(lambda),1);
 rocstats = zeros(length(lambda), 4);
 options = struct('verbose',1,'order',-1);
-emrca_options = struct('showProgress',0 , 'verbose',0, 'errorCheck',1);
+emrca_options = struct('showProgress',0, 'verbose',0, 'errorCheck',1);
 
 %% Data generation.
 d = 50; % Observed dimensions.
@@ -106,17 +106,18 @@ figure(4), clf, imagesc(WWt_hat - WWt), title('WW''-WWt_hat'), colorbar;
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative
 % application of GLASSO and RCA.
-sigma2_n = .01*trace(Cy); % 0.045 * trace(Cy)/d;        % Noise variance. (.045, .025)
+sigma2_n = (1e-3) * trace(Cy); % 0.045 * trace(Cy)/d;        % Noise variance. (.045, .025)
 [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');    % Initialise W with a PCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 WWt_hat_old = W_hat_old * W_hat_old';
-Lambda_hat_old = pdinv(Cy); % eye(d);
+% WWt_hat_old = WWt_hat_old + (trace(WWt_hat_old)/d)*1e-6;
+Lambda_hat_old = eye(d); % pdinv(Cy); % 
 tic
 parfor (i = 1:length(lambda),8)    % Try different magnitudes of lambda.
     [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, emrca_options);
     % Plot results.
     figure(5), clf, colormap('hot')
-    subplot(131), imagesc(Lambda_hat_new), colorbar, title([ 'GLasso/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
+    subplot(131), imagesc(Lambda_hat_new), colorbar, title([ 'EM/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
     subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
     WWt_hat_new(WWt_hat_new > max(WWt(:))) = max(WWt(:));   WWt_hat_new(WWt_hat_new < min(WWt(:))) = min(WWt(:));
     subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
@@ -138,4 +139,4 @@ KGLxy = [1,0; 0.933,0; 0.8,0.01; 0.8,0.03; 0.733,0.04; 0.46,0.125; 0.41, 0.433; 
 IGLxy = [1,0; 0.933,0; 0.866,0.133; 0.6,0.2; 0.45,0.325; 0.125,0.666; 0.05,1];
 plot(GLxy(:,1), GLxy(:,2), 'bo-', KGLxy(:,1), KGLxy(:,2), 'gx-', IGLxy(:,1), IGLxy(:,2), 'm.-')
 legend('EM-RCA','Glasso','Kr-Glasso','Ideal Glasso')
-figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'RCA-GLasso auc: ' num2str(AUC) ], 4), title('ROC');
+figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'EM/RCA auc: ' num2str(AUC) ], 4), title('ROC');

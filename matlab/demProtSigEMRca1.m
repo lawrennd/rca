@@ -85,7 +85,7 @@ parfor (i = 1:length(lambda),8)            % Try different magnitudes of lambda.
     [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, emrca_options);
     % Plot results.
     figure(5), clf, colormap('hot')
-    subplot(131), imagesc(Lambda_hat_new), colorbar, title([ 'GLasso/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
+    subplot(131), imagesc(Lambda_hat_new), colorbar, title([ 'EM/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
     subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
     subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
     % Performance stats. Row format in pstats : [ TP FP FN TN ].
@@ -102,6 +102,6 @@ FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max
 figure(3), hold on, plot(Recalls, Precisions), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), title('Recall-Precision')
 text(Recalls+jit, Precisions+jit, num2cell(lambda))
 hold on, plot([1,.87,.27],[.275,.26,.57], 'g-', [1,.67,.2], [.275,.3,.5], 'b-'), legend('EM-RCA','Kronecker-Glasso','Glasso') % literature performance
-figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'RCA-GLasso auc: ' num2str(AUC) ], 4), title('ROC');
+figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'EM/RCA auc: ' num2str(AUC) ], 4), title('ROC');
 
 % end

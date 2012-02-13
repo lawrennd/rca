@@ -24,7 +24,8 @@ limit = 1e-4;
 lambda = 5.^linspace(-8,3,30);
 Lambda_hat = cell(length(lambda),1);    % Sigma_hat = cell(length(lambda),1); 
 rocstats = zeros(length(lambda), 4);
-showProgress = 0;
+emrca_options = struct('showProgress',0 , 'verbose',0, 'errorCheck',1);
+options = struct('verbose',1,'order',-1);
 
 %% Import mocap data.
 [points, pointNames] = mocapParseText('walkSitJog.txt');
@@ -77,13 +78,13 @@ figure(3), imagesc(Cy)
  % xyzankurAnimCompareMultiple(Ytest0, {}, 96, {'Ytest'}); % Animate mocap time-series.
 
 %% Standard Glasso on mocap data, with varying lambda.
+%{
 warmLambda_hat = eye(d);
 funObj = @(x)sparsePrecisionObj(x, d, nonZero, Cy);
-options.verbose = 1;    options.order = -1;
-parfor (i = 1:length(lambda), 2)
+for (i = 1:length(lambda))
     Lambda_hat{i} = eye(d);
     Lambda_hat{i}(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda(i)*ones(d*d,1), options);
-    rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat{i});   % Performance evaluation.
+    rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat{i}<0);   % Performance evaluation.
     
     figure(3), imagesc(Lambda_hat{i}), colormap(hot), colorbar, title([ 'GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
 end
@@ -96,23 +97,20 @@ figure(4), clf, hold on, plot(FPRs, Recalls, '-xb'), xlim([0 1]), xlabel('FPR'),
 %}
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of GLASSO and RCA.
-sigma2_n = 0.05 * trace(Cy)/d;        % Noise variance. (0.1)
+sigma2_n = 0.01 * trace(Cy);        % Noise variance.
 [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend'); % Initialise W with a PPCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 WWt_hat_old = W_hat_old * W_hat_old';
 Lambda_hat_old = eye(d);
-for i = 1:length(lambda)            % Try different magnitudes of lambda.
-    [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, showProgress);
-    
+parfor (i = 1:length(lambda),8)            % Try different magnitudes of lambda.
+    [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, emrca_options);
     % Plot results.
     figure(5), clf, colormap('hot')
-    subplot(131), imagesc(Lambda_hat_new), colorbar, title([ 'GLasso/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
+    subplot(131), imagesc(Lambda_hat_new), colorbar, title([ 'EM/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
     subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
-        %     WWt_hat_new(WWt_hat_new > max(WWt(:))) = max(WWt(:));   WWt_hat_new(WWt_hat_new < min(WWt(:))) = min(WWt(:));
     subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
-    
     % Performance stats. Row format in pstats : [ TP FP FN TN ].
-    rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new);
+    rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new<0);
 end
 
 %% Processing performance measures.
@@ -123,5 +121,5 @@ FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max
 %% Plot performance.
 figure(3), plot(Recalls, Precisions, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), title('Recall-Precision')
 hold on, text(Recalls, Precisions, num2cell(lambda)), legend('EM-RCA')
-figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'RCA-GLasso auc: ' num2str(AUC) ], 4), title('ROC')
+figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'EM/RCA auc: ' num2str(AUC) ], 4), title('ROC')
 
