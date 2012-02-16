@@ -1,4 +1,4 @@
-% DEMCMUMOCAPEMRCA1 EM-RCA demo on reconstruction of the stick man skeleton
+% DEMCMUMOCAPEMRCA2 EM-RCA demo on reconstruction of the stick man skeleton
 % based on 3-D sensor data from motions across the CMU mocap database.
 %
 % FORMAT
@@ -13,15 +13,13 @@
 
 clc
 addpath(genpath('~/mlprojects/matlab/general/'))
-importTool({'rca','ndlutil','datasets','mocap'})
+importTool({'rca','ndlutil','mocap'})
 addpath(genpath('~/CMUmocap/'))
 addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 addpath(genpath('~/Desktop/CMUmocap/all_asfamc/subjects/'))
 includeMotionCategories
 
-figure(1), clf, colormap('hot');    figure(2), clf, colormap('hot')
-figure(3), clf, colormap('hot');    figure(4), clf, colormap('hot')
-figure(5), clf, colormap('hot')
+figure(1), clf, colormap('hot'); figure(2), clf, colormap('hot'); figure(3), clf, colormap('hot'); figure(4), clf, colormap('hot'); figure(5), clf, colormap('hot')
 
 d = 31;
 Lambda = skelConnectionMatrix(acclaimReadSkel('01.asf'));   Lambda = Lambda + Lambda' + eye(d);
@@ -30,7 +28,6 @@ lambda = 5.^linspace(-8,10,30);
 % lambda = 5.^linspace(1,5,30);
 % lambda = 5.^linspace(4,10,10);
 Lambda_hat = cell(length(lambda),1);
-rocstats = zeros(length(lambda), 4); 
 emrca_options = struct('showProgress',0 , 'verbose',0, 'errorCheck',0);
 options = struct('verbose',1,'order',-1);
 limit = 1e-4;
@@ -38,60 +35,80 @@ limit = 1e-4;
 figure(1), imagesc(Lambda), colorbar, title('Ground truth network')
 
 %{
-[walkSkeletons, walkChannels, walkXYZChannels] = collectSkeletonData(walking, .2, false);
-[runSkeletons, runChannels, runXYZChannels] = collectSkeletonData(running, .2, false);
-[jumpSkeletons, jumpChannels, jumpXYZChannels] = collectSkeletonData(jumping, .2, false);
-[miscSkeletons, miscChannels, miscXYZChannels] = collectSkeletonData({playground, physical_activities_and_sports, situations_and_scenarios }, .2, false);
-[allSkeletons, allChannels, allXYZChannels] = collectSkeletonData(categories); % Takes several hours. Run once.
-[danceSkeletons, danceChannels, danceXYZChannels] = collectSkeletonData(dance, .1, false);
+[walkSkeletons, walkChannels, walkXYZChannels] = collectSkeletonData(walking, .01, false);
+[danceSkeletons, danceChannels, danceXYZChannels] = collectSkeletonData(dance, .01, false);
 %}
+load walk_dance_Channels.mat
 
 %% Compute centred squared-distance matrix (kernel) for every frame.
-HKH_sum = zeros(d,d);
 H = eye(d) - ones(d)./d;
 counter = 0;
-Y = zeros(1000000,31);
-Yaux = zeros(1000000,31);
-% figure(5), handle = xyzVisualise(reshape(jumpXYZChannels{1}{1}(1,:), [], 3), jumpSkeletons{1}{1});
-
-% Channels = {walkChannels runChannels jumpChannels miscChannels}; XYZChannels = {walkXYZChannels runXYZChannels jumpXYZChannels miscXYZChannels};
-Channels = {danceChannels}; XYZChannels = {danceXYZChannels};
-tic
-for iChannel = 1:length(Channels)
-    for iSubject = 1:length(Channels{iChannel})
-        for iTrial = 1:length(Channels{iChannel}{iSubject})
-            for iFrame = 1:ceil(size(Channels{iChannel}{iSubject}{iTrial},1)/10)
-                if counter == 30
-                    break
-                end
-                X = reshape(XYZChannels{iChannel}{iSubject}{iTrial}(iFrame,:), [], 3);
-                %   X = X + X.*randn(size(X))*1e-3;
-                %   xyzModify(handle, X, jumpSkeletons{iSubject}{iTrial});
-                HX = H*X;  % HKH = HX*HX';
-                Y(counter*3+1:(counter+1)*3,:) = HX';
-                Yaux = Y(1:(counter+1)*3,:);	A = Yaux'*Yaux / size(Yaux,1);
-                [B, U, jitter] = pdinv(A); % pdinv(HKH_sum);
-                if cond(B) < 1e+10
-                    counter = counter + 1;
-                    %   HKH_sum = HKH_sum + HKH;
-                    rocstats(counter,:) = emrcaRocStats(Lambda, B<0);   % Performance evaluation.
-                else
-                    Y(counter*3+1:(counter+1)*3,:) = zeros(3,d);
-                end
+Y = {zeros(100000,31) zeros(100000,31)};
+Yaux = zeros(100000,31);
+xyz = {zeros(10000,93) zeros(10000,93)};
+Channels = {walkChannels danceChannels}; XYZChannels = {walkXYZChannels danceXYZChannels}; Skeletons = {walkSkeletons danceSkeletons};
+nFrames = zeros(1,length(Channels));
+rocstats = zeros(2,4);
+for iCh = 1:length(Channels)
+    for iSubject = 1:length(Channels{iCh})
+        for iTrial = 1:length(Channels{iCh}{iSubject})
+            for iFrame = 1:ceil(size(Channels{iCh}{iSubject}{iTrial},1))
+                nFrames(iCh) = nFrames(iCh) + 1;
+                xyz{iCh}(nFrames(iCh),:) = XYZChannels{iCh}{iSubject}{iTrial}(iFrame,:);
             end
+            %   skelPlayData(Skeletons{iCh}{iSubject}{iTrial}, Channels{iCh}{iSubject}{iTrial})
+        end
+    end
+    isIll = true;
+    Y{iCh} = zeros(nFrames(iCh)*3,d);
+    while isIll
+        nicexyz = xyz{iCh}(randsample(nFrames(iCh),100),:);
+        for i = 1:size(nicexyz,1)
+            X = reshape(nicexyz(i,:), [], 3);
+            Y{iCh}((i-1)*3+1:i*3,:) = (H*X)';
+        end
+        [B, U, jitter] = pdinv(Y{iCh}'*Y{iCh} / size(Y{iCh},1));
+        rocstats(iCh,:) = emrcaRocStats(Lambda, B<0);   % Measure of how good B is for initializing Lambda_hat.
+        if cond(B) < 1e+10
+            isIll = false;
         end
     end
 end
-Y = Y(1:counter*3,:);
-Cy = Y'*Y / size(Y,1); % HKH_sum / (counter*3);
-jit = randn(counter,1)*.001;  
-rocstats = rocstats(1:counter, :);
-toc
+
+%{
+% for iCh = 1:length(Channels)
+%     for iSubject = 1:length(Channels{iCh})
+%         for iTrial = 1:length(Channels{iCh}{iSubject})
+%             for iFrame = 1:ceil(size(Channels{iCh}{iSubject}{iTrial},1))
+%                 x = XYZChannels{iCh}{iSubject}{iTrial}(iFrame,:);
+%                 X = reshape(x, [], 3);
+%                 HX = H*X;
+%                 Y(nFrames(iCh)*3+1:(nFrames(iCh)+1)*3,:) = HX';
+%                 Yaux = Y(1:(nFrames(iCh)+1)*3,:);
+%                 A = Yaux'*Yaux / size(Yaux,1);
+%                 [B, U, jitter] = pdinv(A);
+%                 if cond(B) < 1e+10
+%                     nFrames(iCh) = nFrames(iCh) + 1;
+%                     xyz{iCh}(nFrames(iCh),:) = XYZChannels{iCh}{iSubject}{iTrial}(iFrame,:);
+%                     rocstats(nFrames(iCh),:) = emrcaRocStats(Lambda, B<0);   % Performance evaluation.
+%                 else
+%                     Y(nFrames(iCh)*3+1:(nFrames(iCh)+1)*3,:) = zeros(3,d);
+%                 end
+%             end
+%             %   skelPlayData(Skeletons{iCh}{iSubject}{iTrial}, Channels{iCh}{iSubject}{iTrial})
+%         end
+%     end
+% end
+%}
+
+Y = Y{1};   % 1 for walking, 2 for dancing
+Cy = Y'*Y / size(Y,1);
+jit = randn(2,1)*.001;
 
 TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3);  Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 figure(2), imagesc(Cy), colorbar, title('Sum of centred sq.distance matrices across frames')
 figure(3), clf, hold on, plot(Recalls, Precisions, '.b'), text(Recalls(1:end)+jit, Precisions(1:end)+jit, num2cell(1:counter), 'fontsize',7), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), legend('inv.cov'), title('Recall-Precision')
-figure(3), text(Recalls(end), Precisions(end), num2cell(counter), 'fontsize', 8, 'color', 'red', 'fontweight', 'bold')
+% figure(3), text(Recalls(end), Precisions(end), num2cell(counter), 'fontsize', 8, 'color', 'red', 'fontweight', 'bold')
 figure(5), imagesc(pdinv(Cy)), colorbar, title('empirical inverse-covariance ')
 %}
 
@@ -110,7 +127,8 @@ end
 TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3);
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 jit = randn(length(lambda),1)*.001;
-figure(3), hold on, plot(Recalls, Precisions, '-xr', 'Markersize',10), text(Recalls+jit, Precisions+jit, num2cell(lambda),'fontsize',8), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), legend('Glasso'), title('Recall-Precision')
+figure(3), hold on, plot(Recalls, Precisions, '-xr', 'Markersize',10), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), legend('Glasso'), title('Recall-Precision')
+% text(Recalls+jit, Precisions+jit, num2cell(lambda),'fontsize',8)
 
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of EM and RCA.

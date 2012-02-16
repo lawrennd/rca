@@ -21,7 +21,7 @@ figure(3), clf, colormap('hot');    figure(4), clf, colormap('hot')
 figure(5), clf, colormap('hot')
 
 limit = 1e-4;
-lambda = 5.^linspace(-8,3,30);
+lambda = 5.^linspace(-8,-5,10);
 Lambda_hat = cell(length(lambda),1);    % Sigma_hat = cell(length(lambda),1); 
 rocstats = zeros(length(lambda), 4);
 emrca_options = struct('showProgress',0 , 'verbose',0, 'errorCheck',1);
@@ -97,12 +97,13 @@ figure(4), clf, hold on, plot(FPRs, Recalls, '-xb'), xlim([0 1]), xlabel('FPR'),
 %}
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of GLASSO and RCA.
-sigma2_n = 0.01 * trace(Cy);        % Noise variance.
-[S D] = eig(Cy);     [D perm] = sort(diag(D),'descend'); % Initialise W with a PPCA low-rank estimate.
+sigma2_n = 0.001 * trace(Cy);                                % Noise variance.
+[S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');    % Initialise W with a PPCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 WWt_hat_old = W_hat_old * W_hat_old';
-Lambda_hat_old = eye(d);
-parfor (i = 1:length(lambda),8)            % Try different magnitudes of lambda.
+Lambda_hat_old = eye(d); % pdinv(Cy); %
+tic
+parfor (i = 1:length(lambda),8)                             % Try different magnitudes of lambda.
     [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, emrca_options);
     % Plot results.
     figure(5), clf, colormap('hot')
@@ -112,6 +113,7 @@ parfor (i = 1:length(lambda),8)            % Try different magnitudes of lambda.
     % Performance stats. Row format in pstats : [ TP FP FN TN ].
     rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new<0);
 end
+toc
 
 %% Processing performance measures.
 TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3); TNs = rocstats(:,4); 
