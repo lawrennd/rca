@@ -26,7 +26,6 @@ function [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(...
 [n, d] = size(Y);
 Cy = Y' * Y /n;
 Lambda_hat_new = eye(d);
-    % nonZero = find(ones(d));    % To induce any prior knowledge of zeros. Typically all ones.
 L1GPoptions.order = -1;         % -1: L-BFGS (limited-memory), 1: BFGS (full-memory), 2: Newton
 L1GPoptions.verbose = 0;
     % warmInit = true;
