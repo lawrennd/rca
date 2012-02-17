@@ -30,8 +30,8 @@ lambda = 5.^linspace(-8,10,30);
 % lambda = 5.^linspace(1,5,30);
 % lambda = 5.^linspace(4,10,10);
 Lambda_hat = cell(length(lambda),1);
-rocstats = zeros(length(lambda), 4); 
-emrca_options = struct('showProgress',0 , 'verbose',0, 'errorCheck',0);
+GLASSOrocstats = zeros(length(lambda), 4);   EMRCArocstats = zeros(length(lambda), 4); 
+emrca_options = struct('limit',1e-4, 'showProgress',0 , 'verbose',0, 'errorCheck',0, 'maxNumIter',1000);
 options = struct('verbose',1,'order',-1);
 limit = 1e-4;
 
@@ -97,17 +97,16 @@ figure(5), imagesc(pdinv(Cy)), colorbar, title('empirical inverse-covariance ')
 
 %% Standard Glasso on mocap data, with varying lambda.
 %
-rocstats = zeros(length(lambda), 4);
 warmLambda_hat =  pdinv(Cy);
 funObj = @(x)sparsePrecisionObj(x, d, nonZero, Cy);
 parfor (i = 1:length(lambda),8)
     Lambda_hat{i} = eye(d);
     Lambda_hat{i}(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda(i)*ones(d*d,1), options);
     % Performance stats. Row format in pstats : [ TP FP FN TN ].
-    rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat{i}<0);
+    GLASSOrocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat{i}<0);
     figure(5), imagesc(Lambda_hat{i}), colormap(hot), colorbar, title([ 'GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
 end
-TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3);
+TPs = GLASSOrocstats(:,1); FPs = GLASSOrocstats(:,2); FNs = GLASSOrocstats(:,3);
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 jit = randn(length(lambda),1)*.001;
 figure(3), hold on, plot(Recalls, Precisions, '-xr', 'Markersize',10), text(Recalls+jit, Precisions+jit, num2cell(lambda),'fontsize',8), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), legend('Glasso'), title('Recall-Precision')
@@ -116,7 +115,6 @@ figure(3), hold on, plot(Recalls, Precisions, '-xr', 'Markersize',10), text(Reca
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of EM and RCA.
 %
 % lambda = 5.^linspace(1,5,10);
-
 sigma2_n = .01*trace(Cy);                                   % Noise variance.
 [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');    % Initialise W with a PCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
@@ -124,17 +122,17 @@ WWt_hat_old = W_hat_old * W_hat_old';
 Lambda_hat_new = cell(length(lambda),1);
 Lambda_hat_old = pdinv(Cy);                                 % Initialise Lambda_hat with the empirical inverse-covariance.
 parfor (i = 1:length(lambda),8)                             % Try different magnitudes of lambda.
-    [WWt_hat_new, Lambda_hat_new{i}, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, emrca_options);
+    [WWt_hat_new, Lambda_hat_new{i}, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, emrca_options);
     % Plot results.
     figure(5), clf, subplot(121), imagesc(Lambda_hat_new{i}), colorbar, title([ 'EM/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
     subplot(122), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
     % Performance stats. Row format in pstats : [ TP FP FN TN ].
-    rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new{i}<0);
+    EMRCArocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new{i}<0);
 end
 
 
 %% Process performances measures.
-TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3); TNs = rocstats(:,4);
+TPs = EMRCArocstats(:,1); FPs = EMRCArocstats(:,2); FNs = EMRCArocstats(:,3); TNs = EMRCArocstats(:,4);
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
 %% Plot performance.

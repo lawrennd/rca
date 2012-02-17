@@ -25,9 +25,9 @@ lambda = 5.^linspace(-8,3,30);
 Sigma_hat = cell(length(lambda),1); Lambda_hat = cell(length(lambda),1);
 triuLambda_hat = cell(length(lambda),1);
 B = cell(length(lambda),1);
-rocstats = zeros(length(lambda), 4);
+GLASSOrocstats = zeros(length(lambda), 4);   EMRCArocstats = zeros(length(lambda), 4);
 options = struct('verbose',1,'order',-1);
-emrca_options = struct('showProgress',0, 'verbose',0, 'errorCheck',1);
+emrca_options = struct('limit',1e-4, 'showProgress',0 , 'verbose',0, 'errorCheck',0, 'maxNumIter',1000);
 
 %% Data generation.
 d = 50; % Observed dimensions.
@@ -80,9 +80,9 @@ for c = 1:2
         Lambda_hat{i} = eye(d);
         Lambda_hat{i}(nonZero) = L1GeneralProjection(funObj, warmLambda_hat(nonZero), lambda(i)*ones(d*d,1), options);
         figure(3), imagesc(Lambda_hat{i}), colormap(hot), colorbar, title([ 'GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
-        rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat{i});
+        GLASSOrocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat{i});
     end
-    TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3); TNs = rocstats(:,4); 
+    TPs = GLASSOrocstats(:,1); FPs = GLASSOrocstats(:,2); FNs = GLASSOrocstats(:,3); TNs = GLASSOrocstats(:,4); 
     Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);    FPRs = FPs ./ (FPs + TNs);
     linestyle = {'-xb','--om'}; legends = {'GL','"Ideal" GL'};
     figure(2), hold on, plot(Recalls, Precisions, linestyle{c}), ylim([0 1]), xlabel('Recall'), ylabel('Precision')
@@ -110,11 +110,10 @@ sigma2_n = (1e-3) * trace(Cy); % 0.045 * trace(Cy)/d;        % Noise variance. (
 [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');    % Initialise W with a PCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 WWt_hat_old = W_hat_old * W_hat_old';
-% WWt_hat_old = WWt_hat_old + (trace(WWt_hat_old)/d)*1e-6;
 Lambda_hat_old = eye(d); % pdinv(Cy); % 
 tic
 parfor (i = 1:length(lambda),8)    % Try different magnitudes of lambda.
-    [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, limit, emrca_options);
+    [WWt_hat_new, Lambda_hat_new, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, emrca_options);
     % Plot results.
     figure(5), clf, colormap('hot')
     subplot(131), imagesc(Lambda_hat_new), colorbar, title([ 'EM/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
@@ -122,12 +121,12 @@ parfor (i = 1:length(lambda),8)    % Try different magnitudes of lambda.
     WWt_hat_new(WWt_hat_new > max(WWt(:))) = max(WWt(:));   WWt_hat_new(WWt_hat_new < min(WWt(:))) = min(WWt(:));
     subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
     % Performance stats. Row format in pstats : [ TP FP FN TN ].
-    rocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new);
+    EMRCArocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_new);
 end
 toc
 
 %% Process performances measures.
-TPs = rocstats(:,1); FPs = rocstats(:,2); FNs = rocstats(:,3); TNs = rocstats(:,4); 
+TPs = EMRCArocstats(:,1); FPs = EMRCArocstats(:,2); FNs = EMRCArocstats(:,3); TNs = EMRCArocstats(:,4); 
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
 
