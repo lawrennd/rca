@@ -20,7 +20,6 @@ figure(1), clf, colormap('hot');    figure(2), clf, colormap('hot')
 figure(3), clf, colormap('hot');    figure(4), clf, colormap('hot')
 figure(5), clf, colormap('hot')
 
-limit = 1e-4;
 lambda = 5.^linspace(-8,-5,10);
 Lambda_hat = cell(length(lambda),1);    % Sigma_hat = cell(length(lambda),1); 
 GLASSOrocstats = zeros(length(lambda), 4);   EMRCArocstats = zeros(length(lambda), 4);

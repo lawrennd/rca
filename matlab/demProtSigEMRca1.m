@@ -22,7 +22,6 @@ figure(1), clf, colormap('hot');    figure(2), clf, colormap('hot')
 figure(3), clf, colormap('hot');    figure(4), clf, colormap('hot')
 figure(5), clf, colormap('hot')
 
-limit = 1e-4;
 lambda = 5.^linspace(-8,3,50);
 Sigma_hat = cell(length(lambda),1); Lambda_hat = cell(length(lambda),1);
 triuLambda_hat = cell(length(lambda),1);

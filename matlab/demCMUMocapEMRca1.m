@@ -26,12 +26,11 @@ figure(5), clf, colormap('hot')
 d = 31;
 Lambda = skelConnectionMatrix(acclaimReadSkel('01.asf'));   Lambda = Lambda + Lambda' + eye(d);
 nonZero = find(ones(d));                    % Induce any prior knowledge of zeros. If none, this is all ones.
-lambda = 5.^linspace(-8,10,30);
-% lambda = 5.^linspace(1,5,30);
+% lambda = 5.^linspace(-8,10,30);
+lambda = 5.^linspace(-8,3,30);
 % lambda = 5.^linspace(4,10,10);
 Lambda_hat = cell(length(lambda),1);
 GLASSOrocstats = zeros(length(lambda), 4);   EMRCArocstats = zeros(length(lambda), 4); 
-emrca_options = struct('limit',1e-4, 'showProgress',0 , 'verbose',0, 'errorCheck',0, 'maxNumIter',1000);
 options = struct('verbose',1,'order',-1);
 limit = 1e-4;
 
@@ -52,6 +51,7 @@ H = eye(d) - ones(d)./d;
 counter = 0;
 Y = zeros(1000000,31);
 Yaux = zeros(1000000,31);
+rocstats = zeros(1000000,4);
 % figure(5), handle = xyzVisualise(reshape(jumpXYZChannels{1}{1}(1,:), [], 3), jumpSkeletons{1}{1});
 
 % Channels = {walkChannels runChannels jumpChannels miscChannels}; XYZChannels = {walkXYZChannels runXYZChannels jumpXYZChannels miscXYZChannels};
@@ -60,12 +60,9 @@ tic
 for iChannel = 1:length(Channels)
     for iSubject = 1:length(Channels{iChannel})
         for iTrial = 1:length(Channels{iChannel}{iSubject})
-            for iFrame = 1:ceil(size(Channels{iChannel}{iSubject}{iTrial},1)/10)
-                if counter == 30
-                    break
-                end
+            for iFrame = 1:ceil(size(Channels{iChannel}{iSubject}{iTrial},1)/1)
                 X = reshape(XYZChannels{iChannel}{iSubject}{iTrial}(iFrame,:), [], 3);
-                %   X = X + X.*randn(size(X))*1e-3;
+%                 X = X + X.*randn(size(X))*1e-1;
                 %   xyzModify(handle, X, jumpSkeletons{iSubject}{iTrial});
                 HX = H*X;  % HKH = HX*HX';
                 Y(counter*3+1:(counter+1)*3,:) = HX';
@@ -97,7 +94,7 @@ figure(5), imagesc(pdinv(Cy)), colorbar, title('empirical inverse-covariance ')
 
 %% Standard Glasso on mocap data, with varying lambda.
 %
-warmLambda_hat =  pdinv(Cy);
+warmLambda_hat =  eye(d); % pdinv(Cy);
 funObj = @(x)sparsePrecisionObj(x, d, nonZero, Cy);
 parfor (i = 1:length(lambda),8)
     Lambda_hat{i} = eye(d);
@@ -114,13 +111,14 @@ figure(3), hold on, plot(Recalls, Precisions, '-xr', 'Markersize',10), text(Reca
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of EM and RCA.
 %
-% lambda = 5.^linspace(1,5,10);
+lambda = 5.^linspace(-8,-4,30);
+emrca_options = struct('limit',1e-4, 'showProgress',0 , 'verbose',0, 'errorCheck',1, 'maxNumIter',1000);
 sigma2_n = .01*trace(Cy);                                   % Noise variance.
 [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');    % Initialise W with a PCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 WWt_hat_old = W_hat_old * W_hat_old';
 Lambda_hat_new = cell(length(lambda),1);
-Lambda_hat_old = pdinv(Cy);                                 % Initialise Lambda_hat with the empirical inverse-covariance.
+Lambda_hat_old = eye(d); % pdinv(Cy);                                 % Initialise Lambda_hat with the empirical inverse-covariance.
 parfor (i = 1:length(lambda),8)                             % Try different magnitudes of lambda.
     [WWt_hat_new, Lambda_hat_new{i}, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, emrca_options);
     % Plot results.

@@ -60,9 +60,11 @@ while ~converged && iter < options.maxNumIter
         
         if (lowerBound_e - lml_new_rca < -1e-6)
             warning([num2str(lowerBound_e - lml_new_rca) ' LowerBound smaller than LML_rca after this E step! Iter:' num2str(iter)]);
+            break
         end
         if (abs(lml_new_e - lowerBound_e) > 1e-6) % too high?! was 1e-8
             warning([num2str(lml_new_e - lowerBound_e) ' significant difference between LML and LB_e after this E step! Iter:' num2str(iter)]); %#ok<*WNTAG>
+            break
         end
         if (lowerBound_e - lowerBound_m < -1e-6)  % too high?! was 0
             warning([num2str(lowerBound_e - lowerBound_m) ' drop of LowerBound after this E step ! Iter:' num2str(iter)]);
@@ -139,7 +141,7 @@ while ~converged && iter < options.maxNumIter
             break
         else
             converged = true;
-            fprintf('EM-RCA algorithm converged.\n\n')
+            fprintf('EM-RCA converged.\n\n')
         end
     end
     
