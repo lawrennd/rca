@@ -10,7 +10,6 @@
 %
 % RCA
 
-
 clc
 addpath(genpath('~/mlprojects/matlab/general/'))
 importTool({'rca','ndlutil','datasets','mocap'})
@@ -19,20 +18,19 @@ addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 addpath(genpath('~/Desktop/CMUmocap/all_asfamc/subjects/'))
 includeMotionCategories
 
-figure(1), clf, colormap('hot');    figure(2), clf, colormap('hot')
-figure(3), clf, colormap('hot');    figure(4), clf, colormap('hot')
-figure(5), clf, colormap('hot')
+figure(1), clf, colormap('hot');    figure(2), clf, colormap('hot');    figure(3), clf, colormap('hot');
+figure(4), clf, colormap('hot');    figure(5), clf, colormap('hot')
 
-d = 31;
-Lambda = skelConnectionMatrix(acclaimReadSkel('01.asf'));   Lambda = Lambda + Lambda' + eye(d);
+
+Lambda = skelConnectionMatrix(acclaimReadSkel('01.asf'));
+d = size(Lambda,1);
+Lambda = Lambda + Lambda' + eye(d);
 nonZero = find(ones(d));                    % Induce any prior knowledge of zeros. If none, this is all ones.
-% lambda = 5.^linspace(-8,10,30);
 lambda = 5.^linspace(-8,3,30);
-% lambda = 5.^linspace(4,10,10);
 Lambda_hat = cell(length(lambda),1);
-GLASSOrocstats = zeros(length(lambda), 4);   EMRCArocstats = zeros(length(lambda), 4); 
+GLASSOrocstats = zeros(length(lambda), 4);
+EMRCArocstats = zeros(length(lambda), 4); 
 options = struct('verbose',1,'order',-1);
-limit = 1e-4;
 
 figure(1), imagesc(Lambda), colorbar, title('Ground truth network')
 
@@ -44,6 +42,8 @@ figure(1), imagesc(Lambda), colorbar, title('Ground truth network')
 [allSkeletons, allChannels, allXYZChannels] = collectSkeletonData(categories); % Takes several hours. Run once.
 [danceSkeletons, danceChannels, danceXYZChannels] = collectSkeletonData(dance, .1, false);
 %}
+load walk_jump_run_misc_Channels.mat
+walkSkeletons{11} = {}; walkChannels{11} = {}; walkXYZChannels{11} = {}; % remove stealth motions.
 
 %% Compute centred squared-distance matrix (kernel) for every frame.
 HKH_sum = zeros(d,d);

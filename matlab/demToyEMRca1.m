@@ -19,9 +19,6 @@ figure(1), clf, colormap('hot'); figure(2), clf, colormap('hot'); figure(3), clf
 
 % General settings.
 lambda = 5.^linspace(-8,3,30);
-Sigma_hat = cell(length(lambda),1);
-triuLambda_hat = cell(length(lambda),1);
-B = cell(length(lambda),1);
 rocstats = zeros(length(lambda), 4);
 GLASSOrocstats = {zeros(length(lambda), 4) zeros(length(lambda), 4)};
 EMRCArocstats = zeros(length(lambda), 4);
@@ -63,11 +60,8 @@ load simdata_Y.mat;
  %}    
 rho = sqrt((trace(XW'*XW)/trace(V'*V)) * 1);
 sigma_n = sqrt(((trace(XW'*XW) + trace((rho^2)*(V'*V)))/trace(E'*E)) * .1);
-% sigma_n_unc = sqrt((trace((rho^2)*(V'*V))/trace(E'*E)) * 1);
 Y = XW + rho*V + sigma_n*E;
 Y_unc = rho*V + sigma_n*E;
-% Y = XW + rho*V + E;
-% Y_unc = rho*V + E;
 %{
 % Sample from p(Y).
 W = randn(d,p);
@@ -77,13 +71,13 @@ Y = gaussSamp(Theta, n);
 %}
 
 iSub = randsample(n,ceil(n*.9));        % Sub-sample from data.
-% Y = Y(iSub,:);                        % *** un-comment when doing stability selection ***
-% Y_unc = Y_unc(iSub,:);
+Y = Y(iSub,:);                          % *** un-comment when doing stability selection ***
+Y_unc = Y_unc(iSub,:);
 
 Y = Y - repmat(mean(Y),size(Y,1),1);
 Y_unc = Y_unc - repmat(mean(Y_unc),size(Y_unc,1),1);
-Cy = Y' * Y /n;
-nonZero = find(ones(d));    % Induce any prior knowledge of zeros. If not, this is all ones.
+Cy = Y' * Y / size(Y,1);
+nonZero = find(ones(d));                % Induce any prior knowledge of zeros. If not, this is all ones.
 
 figure(1), subplot(131), imagesc(Lambda), title('sparse \Lambda'), colorbar
 subplot(132), imagesc(Sigma), title('sparse-inverse \Sigma'), colorbar
@@ -95,7 +89,7 @@ Y_ = {Y, Y_unc};
 linestyle = {'-xb','--om'}; legends = {'GL','"Ideal" GL'};
 Lambda_hat_glasso = cell(length(lambda),2);
 for c = 1:2
-    Cy_ = Y_{c}'*Y_{c}/n;
+    Cy_ = Y_{c}'*Y_{c} / size(Y_{c},1);
     warmLambda_hat = eye(d);
     funObj = @(x)sparsePrecisionObj(x, d, nonZero, Cy_);
     parfor (i = 1:length(lambda),8)
@@ -118,7 +112,7 @@ figure(2), legend(legends,1)
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of EM and RCA.
 lambda = 5.^linspace(-8,3,30);
 emrca_options = struct('limit',1e-4, 'showProgress',0 , 'verbose',0, 'errorCheck',1, 'maxNumIter',1000);
-sigma2_n = trace(Cy)*1e-2;          % 0.045 * trace(Cy)/d;        % Noise variance. (.045, .025)
+sigma2_n = (5e-1)*trace(Cy)/d;          % 0.045 * trace(Cy)/d;        % Noise variance. (.045)
 [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');    % Initialise W with a PCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 WWt_hat_old = W_hat_old * W_hat_old';
@@ -133,8 +127,7 @@ parfor (i = 1:length(lambda),8)     % Try different magnitudes of lambda.
     subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
 %     WWt_hat_new(WWt_hat_new > max(WWt(:))) = max(WWt(:));   WWt_hat_new(WWt_hat_new < min(WWt(:))) = min(WWt(:));
 %     subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
-    % Performance stats. Row format in pstats : [ TP FP FN TN ].
-    EMRCArocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_emrca{i});
+    EMRCArocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_emrca{i});    % Performance stats. Row format in pstats : [ TP FP FN TN ].
 end
 toc
 
@@ -150,5 +143,5 @@ figure(2), hold on, plot(Recalls, Precisions, '-rs'), xlim([0 1]), ylim([0 1]), 
 % KGLxy = [1,0; 0.933,0; 0.8,0.01; 0.8,0.03; 0.733,0.04; 0.46,0.125; 0.41, 0.433; 0.2,0.6; 0.125,1];
 % IGLxy = [1,0; 0.933,0; 0.866,0.133; 0.6,0.2; 0.45,0.325; 0.125,0.666; 0.05,1];
 % plot(GLxy(:,1), GLxy(:,2), 'bo-', KGLxy(:,1), KGLxy(:,2), 'gx-', IGLxy(:,1), IGLxy(:,2), 'm.-')
-legend('Gl','Ideal Gl','EM-RCA')
+legend('GL','Ideal GL','EM-RCA')
 % figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'EM/RCA auc: ' num2str(AUC) ], 4), title('ROC');
