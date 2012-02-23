@@ -10,17 +10,16 @@
 %
 % RCA
 
-
-clc
+% clc
 addpath(genpath('~/mlprojects/matlab/general/'))
 importTool({'rca','ndlutil','mocap'})
 addpath(genpath('~/CMUmocap/'))
 addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 addpath(genpath('~/Desktop/CMUmocap/all_asfamc/subjects/'))
-s = RandStream('mcg16807','Seed', 1e+6); RandStream.setDefaultStream(s)
+% s = RandStream('mcg16807','Seed', 1e+6); RandStream.setDefaultStream(s)
 includeMotionCategories
 
-figure(1), clf, colormap('hot'); figure(2), clf, colormap('hot'); figure(3), clf, colormap('hot'); figure(5), clf, colormap('hot')
+% figure(1), clf, colormap('hot'); figure(2), clf, colormap('hot'); figure(5), clf, colormap('hot')
 
 % General settings.
 Lambda = skelConnectionMatrix(acclaimReadSkel('01.asf'));
@@ -28,7 +27,7 @@ d = size(Lambda,1);
 Lambda = Lambda + Lambda' + eye(d);
 nonZero = find(ones(d));                    % Induce any prior knowledge of zeros. If none, this is all ones.
 lambda = 5.^linspace(-8,3,30);
-options = struct('verbose',1,'order',-1);
+options = struct('verbose',0,'order',-1);
 GLASSOrocstats = zeros(length(lambda), 4);
 EMRCArocstats = zeros(length(lambda), 4);
 % figure(1), imagesc(Lambda), colorbar, title('Ground truth network')
@@ -104,14 +103,14 @@ while isIll
 end
 % Y = Ytemp{2};   % 1 for walking, 2 for dancing
 Cy = Y'*Y / size(Y,1);
-figure(2), imagesc(Cy), colorbar, title('Sum of centred sq.distance matrices across frames')
-figure(5), imagesc(pdinv(Cy)), colorbar, title('empirical inverse-covariance ')
+% figure(2), imagesc(Cy), colorbar, title('Sum of centred sq.distance matrices across frames')
+% figure(5), imagesc(pdinv(Cy)), colorbar, title('empirical inverse-covariance ')
 
 
 %% Standard Glasso on mocap data, with varying lambda.
 %
 Lambda_hat_glasso = cell(length(lambda),1);
-warmLambda_hat =  eye(d); % pdinv(Cy);
+warmLambda_hat =  eye(d); 
 funObj = @(x)sparsePrecisionObj(x, d, nonZero, Cy);
 parfor (i = 1:length(lambda),8)
     Lambda_hat_glasso{i} = eye(d);
@@ -120,17 +119,18 @@ parfor (i = 1:length(lambda),8)
     GLASSOrocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_glasso{i}<0);
 %     figure(5), imagesc(Lambda_hat_glasso{i}), colormap(hot), colorbar, title([ 'GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
 end
+%{
 TPs = GLASSOrocstats(:,1); FPs = GLASSOrocstats(:,2); FNs = GLASSOrocstats(:,3);
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 jit = randn(length(lambda),1)*.001;
-figure(3), hold on, plot(Recalls, Precisions, '-xb', 'Markersize',10), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision')
-figure(3), hold on, plot(rocstats(:,1) ./ (rocstats(:,1) + rocstats(:,3)), rocstats(:,1) ./ (rocstats(:,1) + rocstats(:,2)), 'sr'), legend('Glasso','inv.cov')
+figure(2), hold on, plot(Recalls, Precisions, '-xb', 'Markersize',10), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision')
+figure(2), plot(rocstats(:,1) ./ (rocstats(:,1) + rocstats(:,3)), rocstats(:,1) ./ (rocstats(:,1) + rocstats(:,2)), 'sr'), legend('Glasso','inv.cov')
 % text(Recalls+jit, Precisions+jit, num2cell(lambda))
-
+%}
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of EM and RCA.
 % lambda = 5.^linspace(-8,-4,30);
-emrca_options = struct('limit',1e-4, 'showProgress',0 , 'verbose',0, 'errorCheck',1, 'maxNumIter',2000);
+emrca_options = struct('limit',1e-4, 'showProgress',0 , 'verbose',0, 'errorCheck',1, 'maxNumIter',1000);
 sigma2_n = 0.5*trace(Cy)/d; % trace(Cy)*1e-3;                                   % Noise variance.
 [S D] = eig(Cy);    [D perm] = sort(diag(D),'descend');     % Initialise W with a PCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
@@ -146,8 +146,10 @@ parfor (i = 1:length(lambda),8)                             % Try different magn
     EMRCArocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_emrca{i}<0);
 end
 %% Plot performance.
+%{
 TPs = EMRCArocstats(:,1); FPs = EMRCArocstats(:,2); FNs = EMRCArocstats(:,3); TNs = EMRCArocstats(:,4);
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
-figure(3), hold on, plot(Recalls, Precisions, '-og'), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), legend('Glasso','inv.cov','EM-RCA')
+figure(2), hold on, plot(Recalls, Precisions, '-og'), xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision'), legend('Glasso','inv.cov','EM-RCA')
 % text(Recalls+jit, Precisions+jit, num2cell(lambda))
+%}
