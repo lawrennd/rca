@@ -20,11 +20,11 @@ results = cell(100,1);
 for iRestart = 1:nRestarts
     disp(['Restart #', num2str(iRestart)]);
     
-    demCMUMocapEMRca2                          % Insert demo script here for which you want to stabilise results.
+    demToyEMRca1                          % Insert demo script here for which you want to stabilise results.
     
     result = [];
-    result.Lambda_hat_glasso = Lambda_hat_glasso;
-    result.GLASSOrocstats = GLASSOrocstats;
+%     result.Lambda_hat_glasso = Lambda_hat_glasso;
+%     result.GLASSOrocstats = GLASSOrocstats;
     result.Lambda_hat_emrca  = Lambda_hat_emrca;
     result.EMRCArocstats = EMRCArocstats;
     results{iRestart} = result;
@@ -32,16 +32,16 @@ end
 %}
 
 %%
-nReg_glasso = length(results{1}.Lambda_hat_glasso);
-nReg_emrca = length(results{1}.Lambda_hat_emrca);
+% nReg_glasso = length(results{1}.Lambda_hat_glasso);
+% stableLambda_glasso = cell(nReg_glasso, 1);
+% GLASSOrocstats = zeros(nReg_glasso,4);
 % stableLambda_idealglasso = cell(nReg_glasso, 1);
-%IDEALGLASSOrocstats = zeros(nReg_glasso,4);
-stableLambda_glasso = cell(nReg_glasso, 1);
-GLASSOrocstats = zeros(nReg_glasso,4);
+% IDEALGLASSOrocstats = zeros(nReg_glasso,4);
+nReg_emrca = length(results{1}.Lambda_hat_emrca);
 stableLambda_emrca = cell(nReg_emrca, 1);
 EMRCArocstats = zeros(nReg_emrca,4);
 %%
-%
+%{
 for iReg = 1:nReg_glasso
     stableLambda_glasso{iReg} = zeros(d);
     % stableLambda_idealglasso{iReg} = zeros(d);
@@ -75,17 +75,17 @@ for iReg = 1:nReg_emrca
     for iRestart = 1:nRestarts
         triuLambda_hat = triu(results{iRestart}.Lambda_hat_emrca{iReg}, 1);
         stableLambda_emrca{iReg} = stableLambda_emrca{iReg} + ...
-            ...% (abs(triuLambda_hat) > 0);          % Edges in the estimated Lambda from EM/RCA.
-            (triuLambda_hat < 0);
+            (abs(triuLambda_hat) > 0);          % Edges in the estimated Lambda from EM/RCA.
+%             (triuLambda_hat < 0);
     end
 	stableLambda_emrca{iReg} = (stableLambda_emrca{iReg} >= round(nRestarts*stabilityThreshold));
     EMRCArocstats(iReg,:) = emrcaRocStats(Lambda, stableLambda_emrca{iReg});
 end
 TPs = EMRCArocstats(:,1); FPs = EMRCArocstats(:,2); FNs = EMRCArocstats(:,3);
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
-plot(Recalls, Precisions, '-rs'), hold on
+figure(2), plot(Recalls, Precisions, '-rs'), hold on
 % plot([1,.87,.27],[.275,.26,.57], 'g-', [1,.67,.2], [.275,.3,.5], 'b--')   % Literature performance.
 xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision')
 % legend('EM-RCA','Kronecker-Glasso (reported)','Glasso (reported)')
-legend('Glasso','EM-RCA')
+legend('EM-RCA')
 

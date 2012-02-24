@@ -9,13 +9,13 @@
 %
 % RCA
 
-clc
+% clc
 addpath(genpath('~/mlprojects/matlab/general/'))
 addpath(genpath('~/mlprojects/rca/matlab/glasso/'))
 addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 importTool({'rca','ndlutil'})
 asym = @(x) sum(sum(abs(x - x.'))); % Asymmetry test.
-figure(1), clf, colormap('hot'); figure(2), clf, colormap('hot'); figure(3), clf, colormap('hot'); figure(4), clf, colormap('hot'); figure(5), clf, colormap('hot')
+% figure(1), clf, colormap('hot'); figure(2), clf, colormap('hot'); figure(3), clf, colormap('hot'); figure(4), clf, colormap('hot'); figure(5), clf, colormap('hot')
 
 % General settings.
 lambda = 5.^linspace(-8,3,30);
@@ -79,12 +79,14 @@ Y_unc = Y_unc - repmat(mean(Y_unc),size(Y_unc,1),1);
 Cy = Y' * Y / size(Y,1);
 nonZero = find(ones(d));                % Induce any prior knowledge of zeros. If not, this is all ones.
 
+%{
 figure(1), subplot(131), imagesc(Lambda), title('sparse \Lambda'), colorbar
 subplot(132), imagesc(Sigma), title('sparse-inverse \Sigma'), colorbar
 subplot(133), imagesc(X*X'), title('Low-rank XX'''), colorbar
+%}
 
 %% Standard Glasso on (un)confounded simulated data, with varying lambda.
-%
+%{
 Y_ = {Y, Y_unc};
 linestyle = {'-xb','--om'}; legends = {'GL','"Ideal" GL'};
 Lambda_hat_glasso = cell(length(lambda),2);
@@ -110,9 +112,8 @@ figure(2), legend(legends,1)
 %}
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative application of EM and RCA.
-lambda = 5.^linspace(-8,3,30);
 emrca_options = struct('limit',1e-4, 'showProgress',0 , 'verbose',0, 'errorCheck',1, 'maxNumIter',1000);
-sigma2_n = (5e-1)*trace(Cy)/d;          % 0.045 * trace(Cy)/d;        % Noise variance. (.045)
+sigma2_n = 0.5*trace(Cy)/d;          % 0.045 * trace(Cy)/d;        % Noise variance. (.045)
 [S D] = eig(Cy);     [D perm] = sort(diag(D),'descend');    % Initialise W with a PCA low-rank estimate.
 W_hat_old = S(:,perm(D>sigma2_n)) * sqrt(diag(D(D>sigma2_n)-sigma2_n));
 WWt_hat_old = W_hat_old * W_hat_old';
@@ -122,16 +123,19 @@ tic
 parfor (i = 1:length(lambda),8)     % Try different magnitudes of lambda.
     [WWt_hat_new, Lambda_hat_emrca{i}, Lambda_hat_new_inv] = emrca(Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda(i), nonZero, emrca_options);
     % Plot results.
+    %{
     figure(5), clf, colormap('hot')
     subplot(131), imagesc(Lambda_hat_emrca{i}), colorbar, title([ 'EM/RCA-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
     subplot(132), imagesc(Lambda_hat_new_inv), colorbar, title('\Sigma_{hat}'), colorbar
 %     WWt_hat_new(WWt_hat_new > max(WWt(:))) = max(WWt(:));   WWt_hat_new(WWt_hat_new < min(WWt(:))) = min(WWt(:));
 %     subplot(133), imagesc(WWt_hat_new), colorbar, title('RCA-recovered WW'''), colorbar
+    %}
     EMRCArocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_emrca{i});    % Performance stats. Row format in pstats : [ TP FP FN TN ].
 end
 toc
 
 %% Process performances measures.
+%{
 TPs = EMRCArocstats(:,1); FPs = EMRCArocstats(:,2); FNs = EMRCArocstats(:,3); TNs = EMRCArocstats(:,4); 
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
@@ -145,3 +149,4 @@ figure(2), hold on, plot(Recalls, Precisions, '-rs'), xlim([0 1]), ylim([0 1]), 
 % plot(GLxy(:,1), GLxy(:,2), 'bo-', KGLxy(:,1), KGLxy(:,2), 'gx-', IGLxy(:,1), IGLxy(:,2), 'm.-')
 legend('GL','Ideal GL','EM-RCA')
 % figure(4), hold on, plot(FPRs, Recalls, '-rs'), xlim([0 1]), ylim([0 1]), xlabel('FPR'), ylabel('TPR'), legend([ 'EM/RCA auc: ' num2str(AUC) ], 4), title('ROC');
+%}
