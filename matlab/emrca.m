@@ -1,4 +1,4 @@
-function [WWt_hat_final, Lambda_hat_final, Lambda_hat_inv_final] = emrca(...
+function [W_hat_final, Lambda_hat_final, Lambda_hat_inv_final] = emrca(...
     Y, WWt_hat_old, Lambda_hat_old, sigma2_n, lambda, nonZero, options)
 
 % EMRCA Through a hybrid EM-RCA iterative algorith, learns a Gaussian
@@ -16,7 +16,7 @@ function [WWt_hat_final, Lambda_hat_final, Lambda_hat_inv_final] = emrca(...
 %
 % SEEALSO :
 %
-% COPYRIGHT : Alfredo A. Kalaitzis, 2011, 2012
+% COPYRIGHT : Alfredo A. Kalaitzis, 2012
 %
 % RCA
 
@@ -148,15 +148,16 @@ while ~converged && iter < options.maxNumIter
     %% Prepare for new iteration.
     lml_old = lml_new_rca;
         %     warmInit = true;
-    Lambda_hat_old = Lambda_hat_new;    WWt_hat_old = WWt_hat_new;  % Sigma_hat_old = Sigma_hat_new;
-    Lambda_hat_final = Lambda_hat_new;  WWt_hat_final = WWt_hat_new;    Lambda_hat_inv_final = Lambda_hat_inv_new;
+    Lambda_hat_old = Lambda_hat_new;    WWt_hat_old = WWt_hat_new;
+    Lambda_hat_final = Lambda_hat_new;  W_hat_final = W_hat_new;
+    Lambda_hat_inv_final = Lambda_hat_inv_new;
     iter = iter + 1;
 end
 
 if iter == options.maxNumIter
     fprintf('Maximum number of iterations reached.\n')
 	Lambda_hat_final = Lambda_hat_new;
-    WWt_hat_final = WWt_hat_new;
+    W_hat_final = W_hat_new;
     Lambda_hat_inv_final = Lambda_hat_inv_new;
 end
 

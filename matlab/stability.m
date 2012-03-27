@@ -32,16 +32,16 @@ end
 %}
 
 %%
-% nReg_glasso = length(results{1}.Lambda_hat_glasso);
-% stableLambda_glasso = cell(nReg_glasso, 1);
-% GLASSOrocstats = zeros(nReg_glasso,4);
 % stableLambda_idealglasso = cell(nReg_glasso, 1);
 % IDEALGLASSOrocstats = zeros(nReg_glasso,4);
+nReg_glasso = length(results{1}.Lambda_hat_glasso);
+stableLambda_glasso = cell(nReg_glasso, 1);
+GLASSOrocstats = zeros(nReg_glasso,4);
 nReg_emrca = length(results{1}.Lambda_hat_emrca);
 stableLambda_emrca = cell(nReg_emrca, 1);
 EMRCArocstats = zeros(nReg_emrca,4);
 %%
-%{
+%
 for iReg = 1:nReg_glasso
     stableLambda_glasso{iReg} = zeros(d);
     % stableLambda_idealglasso{iReg} = zeros(d);
@@ -76,7 +76,7 @@ for iReg = 1:nReg_emrca
         triuLambda_hat = triu(results{iRestart}.Lambda_hat_emrca{iReg}, 1);
         stableLambda_emrca{iReg} = stableLambda_emrca{iReg} + ...
             (abs(triuLambda_hat) > 0);          % Edges in the estimated Lambda from EM/RCA.
-%             (triuLambda_hat < 0);
+%             (triuLambda_hat < 0);             % Use for mocap demos.
     end
 	stableLambda_emrca{iReg} = (stableLambda_emrca{iReg} >= round(nRestarts*stabilityThreshold));
     EMRCArocstats(iReg,:) = emrcaRocStats(Lambda, stableLambda_emrca{iReg});

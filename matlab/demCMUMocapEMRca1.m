@@ -52,7 +52,7 @@ counter = 0;
 Y = zeros(1000000,31);
 Yaux = zeros(1000000,31);
 rocstats = zeros(1000000,4);
-% figure(5), handle = xyzVisualise(reshape(jumpXYZChannels{1}{1}(1,:), [], 3), jumpSkeletons{1}{1});
+figure(5), handle = xyzVisualise(reshape(jumpXYZChannels{1}{1}(1,:), [], 3), skelConnectionMatrix(jumpSkeletons{1}{1}));
 
 % Channels = {walkChannels runChannels jumpChannels miscChannels}; XYZChannels = {walkXYZChannels runXYZChannels jumpXYZChannels miscXYZChannels};
 Channels = {danceChannels}; XYZChannels = {danceXYZChannels};

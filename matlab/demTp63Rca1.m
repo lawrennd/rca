@@ -11,7 +11,7 @@
 %
 % RCA
 
-clear
+% clear
 addpath(genpath('~/mlprojects/matlab/general/'))
 importLatest('netlab')
 importTool({'kern','optimi','datasets','gprege'})
@@ -64,6 +64,6 @@ Xproj = S(:,perm(D>1))'*Y;
 dists = sum(Xproj.^2,1); % Compute norms.
 
 % auc = compareROC(dists, DGatta_labels_byTSNItop100);
-auc = compareROC(dists, DGatta_labels_byTSNItop100, BATSrankingFilepath);
+auc = compareROC(dists, true, DGatta_labels_byTSNItop100, BATSrankingFilepath);
 
     

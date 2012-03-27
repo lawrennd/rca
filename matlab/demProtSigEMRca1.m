@@ -30,7 +30,7 @@ options = struct('verbose',1,'order',-1);
 Y2 = xlsread('2. cd3cd28icam2.xls');
 Y3 = xlsread('3. cd3cd28+aktinhib.xls');
 Y = [Y1;Y2;Y3];
-% selection = randperm(size(Y,1));          % *** comment when doing stability selection ***
+selection = randperm(size(Y,1));          % *** comment when doing stability selection ***
 Y = Y(selection(1:fix(size(Y,1)/10)),:);    % Select 10% of the data. Comment when ALL data are used.
 
 [n,d] = size(Y);
@@ -38,6 +38,7 @@ nonZero = find(ones(d));                    % Induce any prior knowledge of zero
 % Ground truth Lambda
 Lambda = full(sparse([1,1,1, 2,2,2, 3,3, 4, 7, 8,8, 9,9, 1:11], [9,8,2, 9,8,6, 5,4, 5, 8, 11,10, 11,10, 1:11], ones(1,25)));
 Lambda = Lambda + triu(Lambda,1)';
+nodeLabels = {'praf','pmek','plcg','PIP2','PIP3','p44/42','pakts473','PKA','PKC','P38','pjnk'};
 
 iSub = randsample(n,ceil(n*.9));            % Sub-sample from data for stability selection.
 Y = Y(iSub,:);                              % *** un-comment when doing stability selection ***
@@ -52,7 +53,7 @@ jit = randn(length(lambda),1)*.001;
 rocstats = emrcaRocStats(Lambda, B);        % Measure of how good B is for initializing Lambda_hat.
 
 %% Standard Glasso on protein-signalling data, with varying lambda.
-%{
+%
 Lambda_hat_glasso = cell(length(lambda),1);
 funObj = @(x)sparsePrecisionObj(x, d, nonZero, Cy);
 warmLambda_hat = eye(d);
@@ -64,7 +65,7 @@ parfor (i = 1:length(lambda),8)
     GLASSOrocstats(i,:) = emrcaRocStats(Lambda, Lambda_hat_glasso{i});
 end
 %}
-%{
+%
 TPs = GLASSOrocstats(:,1); FPs = GLASSOrocstats(:,2); FNs = GLASSOrocstats(:,3); % TNs = GLASSOrocstats(:,4); 
 Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
 % FPRs = FPs ./ (FPs + TNs);      AUC = trapz(flipud(FPRs), flipud(Recalls)) / max(FPRs);
