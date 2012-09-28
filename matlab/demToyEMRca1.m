@@ -25,7 +25,7 @@ EMRCArocstats = zeros(length(lambda), 4);
 options = struct('verbose',1,'order',-1);
 
 %% Synthetic data.
-d = 50; % Observed dimensions.
+d = 20; % Observed dimensions.
 p = 3;  % Low-rank
 n = 100;
 density = .01;

@@ -41,7 +41,7 @@ Lambda = Lambda + triu(Lambda,1)';
 nodeLabels = {'praf','pmek','plcg','PIP2','PIP3','p44/42','pakts473','PKA','PKC','P38','pjnk'};
 
 iSub = randsample(n,ceil(n*.9));            % Sub-sample from data for stability selection.
-Y = Y(iSub,:);                              % *** un-comment when doing stability selection ***
+% Y = Y(iSub,:);                              % *** un-comment when doing stability selection ***
 
 Y = Y - repmat(mean(Y), size(Y,1), 1);
 Y = Y ./ repmat(std(Y), size(Y,1), 1);      % Normalise features.

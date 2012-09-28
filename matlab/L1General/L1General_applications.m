@@ -7,12 +7,13 @@ addpath(genpath('~/mlprojects/rca/matlab/L1General'))
 
 
 %% LASSO
-%{
+%
 % Generate some data
 nInstances = 250;
-nVars = 50;
+nVars = 100;
 X = randn(nInstances,nVars);
-y = X*((rand(nVars,1) > .5).*randn(nVars,1)) + randn(nInstances,1);
+beta = (rand(nVars,1) > .9) .* randn(nVars,1);
+y = X * beta + randn(nInstances,1);
 
 % Least Squares Solution
 wLS = X\y;
@@ -25,7 +26,7 @@ wRR = R\(R'\(X'*y));
 % LASSO
 lambda = 100*ones(nVars,1); % Penalize the absolute value of each element by the same amount
 funObj = @(w)GaussianLoss(w,X,y); % Loss function that L1 regularization is applied to
-w_init = wRR; % Initial value for iterative optimizer
+w_init = zeros(nVars,1); % wLS; % Initial value for iterative optimizer
 fprintf('\nComputing LASSO Coefficients...\n');
 wLASSO = L1GeneralProjection(funObj,w_init,lambda);
 
@@ -36,22 +37,28 @@ fprintf('Number of non-zero variables in LASSO solution: %d\n',sum(abs(wLASSO)>z
 
 figure(fig);fig=fig+1;
 clf;hold on;
+
 subplot(2,2,1);
-stem(wLS,'r');
+stem(beta,'k');
 xlim([1 nVars]);
 yl = ylim;
-title('Least Squares');
+title('True \beta');
 subplot(2,2,2);
+stem(wLS,'r');
+xlim([1 nVars]);
+ylim(yl);
+title('Least Squares');
+subplot(2,2,3);
 stem(wRR,'b');
 xlim([1 nVars]);
 ylim(yl);
 title('Ridge Regression');
-subplot(2,2,3);
+subplot(2,2,4);
 stem(wLASSO,'g');
 xlim([1 nVars]);
 title('LASSO');
 ylim(yl);
-pause;
+
 %}
 %% Elastic Net
 %{
@@ -457,14 +464,14 @@ title('CRF Transition Potentials');
 pause;
 %}
 %% Graphical Lasso
-
-lambda = .1;
-nInstances = 100;
+%{
+nInstances = 1000;
 options.order = -1;
+lambda = .05;
 
 % Generate a sparse positive-definite precision matrix
-nNodes = 50;
-adj = triu(rand(nNodes) > .95,1);
+nNodes = 500;
+adj = triu(rand(nNodes) > .75,1);
 adj = setdiag(adj+adj',1);
 P = randn(nNodes).*adj;
 P = (P+P')/2;
@@ -478,7 +485,6 @@ mu = randn(nNodes,1);
 
 % Sample from the GGM
 C = inv(X);
-
 R = chol(C)';
 X = zeros(nInstances,nNodes);
 for i = 1:nInstances
@@ -489,40 +495,56 @@ end
 X = standardizeCols(X);
 
 % Train Full GGM
-% sigma_emp = cov(X); sigma_emp = Avg_E_fft;
-% nonZero = find(ones(nNodes));
-% funObj = @(x)sparsePrecisionObj(x,nNodes,nonZero,sigma_emp);
-% Kfull = eye(nNodes);
-% fprintf('Fitting full Gaussian graphical model\n');
-% Kfull_new = eye(nNodes);
+sigma_emp = cov(X);
+nonZero = find(ones(nNodes));
+funObj = @(x)sparsePrecisionObj(x,nNodes,nonZero,sigma_emp);
+Kfull = eye(nNodes);
+fprintf('Fitting full Gaussian graphical model\n');
+Kfull_new = eye(nNodes);
 % Kfull_new(nonZero) = minFunc(funObj,Kfull(nonZero),options);
-% [funObj(Kfull), funObj(Kfull_new)]
-% [log(det(Kfull)) - sum(sum(sigma_emp.*Kfull)), log(det(Kfull_new)) - sum(sum(sigma_emp.*Kfull_new))]
-
-
 
 % Train GGM w/ L1-regularization
-sigma_emp = cov(X); sigma_emp = Avg_E_fft;
+sigma_emp = cov(X);
 nonZero = find(ones(nNodes));
 funObj = @(x)sparsePrecisionObj(x,nNodes,nonZero,sigma_emp);
 Ksparse = eye(nNodes);
 fprintf('Fitting sparse Gaussian graphical model\n');
 Ksparse_new = eye(nNodes);
-Ksparse_new(nonZero) = L1GeneralProjection(funObj,Ksparse(nonZero),lambda*ones(nNodes*nNodes,1),options);
-[funObj(Ksparse), funObj(Ksparse_new)]
-[log(det(Ksparse)) - sum(sum(sigma_emp.*Ksparse)), log(det(Ksparse_new)) - sum(sum(sigma_emp.*Ksparse_new))]
+% Ksparse_new(nonZero) = L1GeneralProjection(funObj,Ksparse(nonZero),lambda*ones(nNodes*nNodes,1),options);
 
 figure(fig);fig=fig+1;
-subplot(1,3,1);
+subplot(1,2,1);
 imagesc(inv(C)), colorbar;
 title('True Precision Matrix')
-subplot(1,3,2);
-imagesc(Kfull_new), colorbar;
-title('Estimated Full Precision Matrix');
-subplot(1,3,3);
+% subplot(1,3,2);
+% imagesc(Kfull_new), colorbar;
+% title('Estimated Full Precision Matrix');
+
+subplot(1,2,2);
+%     lambda = 0.02:0.02:1;
+%     Lambda_hat_glasso = cell(length(lambda),1);
+%     Lambda_hat_glasso2 = cell(length(lambda),1);
+%     for i = 1:length(lambda)
+%         Lambda_hat_glasso{i} = glasso(sigma_emp,lambda(i), 'maxIter', 100);
+%         Ksparse_new(nonZero) = L1GeneralProjection(funObj,Ksparse(nonZero),lambda(i)*ones(nNodes*nNodes,1),options);
+%         Lambda_hat_glasso2{i} = Ksparse_new;
+%           imagesc(Lambda_hat_glasso{i}), colormap(hot), colorbar, title([ 'GLasso-recovered \Lambda with \lambda=', num2str(lambda(i)) ]);
+%         GLASSOrocstats(i,:) = rocStats(inv(C), Lambda_hat_glasso{i});       % Evaluation
+%         GLASSOrocstats2(i,:) = rocStats(inv(C), Lambda_hat_glasso2{i});     % Evaluation
+%     end
+%     TPs = GLASSOrocstats(:,1); FPs = GLASSOrocstats(:,2); FNs = GLASSOrocstats(:,3);
+%     Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
+%     figure(2), clf, colormap hot, hold on,
+%     plot(Recalls, Precisions, '--xb'), % text(Recalls+jit, Precisions+jit, num2cell(lambda)),
+%     TPs = GLASSOrocstats2(:,1); FPs = GLASSOrocstats2(:,2); FNs = GLASSOrocstats2(:,3);
+%     Recalls = TPs ./ (TPs + FNs);   Precisions = TPs ./ (TPs + FPs);
+%     plot(Recalls, Precisions, '--xr'), % text(Recalls+jit, Precisions+jit, num2cell(lambda)),
+%     xlim([0 1]), ylim([0 1]), xlabel('Recall'), ylabel('Precision')
+%     legend('glasso', 'L1-projection','location','best')
+
 imagesc(Ksparse_new), colorbar;
 title('Estimated Sparse Precision Matrix');
-% pause;
+%}
 
 %% Markov Random Field Structure Learning
 %{

@@ -1,11 +1,21 @@
 function pstats = emrcaRocStats(Lambda, Lambda_hat, threshold)
 
-% PERFORMANCESTATS Takes the estimated and ground truth inverse-covariance
-% and computes basic statistics required for plotting ROC and
-% precision-recall curves.
+% EMRCAROCSTATS Compare a connectivity matrix to the ground truth matrix.
 %
 % FORMAT
-% DESC
+% DESC Takes the estimated and ground truth inverse-covariance and computes
+% basic basic statistics required for plotting ROC and precision-recall
+% curves.
+%
+% ARG Lambda : the ground truth connectivity matrix.
+%
+% ARG Lambda_hat : the estimated connectivity matrix.
+%
+% ARG threshold : ignores all elements whose absolute value is smaller than
+% the given threshold.
+%
+% RETURN pstats : a row vector with format:
+%   [#TruePositives #FalsePositives #FalseNegatives #TrueNegatives]
 %
 % SEEALSO :
 %

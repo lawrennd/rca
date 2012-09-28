@@ -20,6 +20,7 @@ function [W_hat_final, Lambda_hat_final, Lambda_hat_inv_final] = emrca(...
 %
 % RCA
 
+% subindex = @(x,n,m) x(n,m);
 
 %% Recovery of sparse-inverse and low-rank covariance via iterative
 % application of EM (with GLASSO) and RCA.
@@ -30,7 +31,12 @@ L1GPoptions.order = -1;         % -1: L-BFGS (limited-memory), 1: BFGS (full-mem
 L1GPoptions.verbose = 0;
     % warmInit = true;
 if options.showProgress
-    figure(2), clf
+    if options.errorCheck
+        figure(2), clf
+    end
+    figure(3), clf
+    semilogy(0, options.limit, '.'), xlim([0 options.maxNumIter]), hold on
+%     ylim([options.limit subindex(ylim,1,2)])
 end
 iter = 1;
 lml_old = -Inf;
@@ -135,6 +141,7 @@ while ~converged && iter < options.maxNumIter
     end
     
     % Convergence / error check.
+    figure(3), semilogy(iter, lml_new_rca - lml_old, 'xr')
     if (lml_new_rca - lml_old) < options.limit
         if (lml_new_rca - lml_old < -1e-6) % too high?!
             warning([num2str(lml_new_rca - lml_old) ' lml drop observed after this iteration! Iter:' num2str(iter)]);
